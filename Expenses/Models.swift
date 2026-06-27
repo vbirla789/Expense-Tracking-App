@@ -4,7 +4,7 @@ import Foundation
 struct Transaction: Identifiable, Codable, Hashable {
     let id: String
     let timestamp: String
-    let amount: Double
+    var amount: Double        // mutable so we can edit in place
     let merchant: String
     var category: String      // mutable so we can re-categorize in place
     let source: String
@@ -30,14 +30,12 @@ struct DataResponse: Codable {
     let error: String?
 }
 
-/// Quick-pick category pills shown in the capture sheet. Edit freely.
-let quickPickCategories = [
-    "Ciggs", "Groceries", "Rent", "Cab", "Food",
-    "Shopping", "Bills", "Health", "Entertainment", "Travel"
-]
+/// The category set — used for both the capture-sheet pills and the filter pills.
+/// Order matters: shown left-to-right exactly like this.
+let quickPickCategories = ["Cab", "Sutta", "Groceries", "Outing", "Rent", "Others"]
 
-/// Full category list for the re-categorize menu (pills + a few extras).
-let allCategories = quickPickCategories + ["Transport", "Transfers", "Income", "Other", "Uncategorized"]
+/// Alias kept for any remaining references.
+let allCategories = quickPickCategories
 
 /// Format a rupee amount with no decimals, e.g. ₹4,239.
 func inr(_ value: Double) -> String {

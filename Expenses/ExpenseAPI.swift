@@ -42,10 +42,16 @@ enum ExpenseAPI {
         ])
     }
 
-    static func update(id: String, category: String) async throws {
+    static func update(id: String, amount: Double?, category: String?) async throws {
+        var body: [String: Any] = ["token": Settings.token, "action": "update", "id": id]
+        if let amount = amount { body["amount"] = amount }
+        if let category = category { body["category"] = category }
+        try await post(body)
+    }
+
+    static func delete(id: String) async throws {
         try await post([
-            "token": Settings.token, "action": "update",
-            "id": id, "category": category
+            "token": Settings.token, "action": "delete", "id": id
         ])
     }
 

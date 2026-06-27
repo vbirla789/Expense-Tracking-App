@@ -12,10 +12,19 @@ final class CaptureCoordinator: ObservableObject {
 
     @Published var isPresenting = false
     @Published var amount: Double?
+    @Published var editing: Transaction?
 
     /// Show the sheet now (amount nil = blank manual entry).
     func begin(amount: Double?) {
+        self.editing = nil
         self.amount = amount
+        self.isPresenting = true
+    }
+
+    /// Show the sheet pre-filled to edit an existing transaction.
+    func beginEdit(_ tx: Transaction) {
+        self.editing = tx
+        self.amount = tx.amount
         self.isPresenting = true
     }
 

@@ -39,10 +39,31 @@ final class Store: ObservableObject {
 
     func recategorize(_ tx: Transaction, to category: String) async {
         do {
-            try await ExpenseAPI.update(id: tx.id, category: category)
+            try await ExpenseAPI.update(id: tx.id, amount: nil, category: category)
             if let i = transactions.firstIndex(where: { $0.id == tx.id }) {
                 transactions[i].category = category
             }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func edit(_ tx: Transaction, amount: Double, category: String) async {
+        do {
+            try await ExpenseAPI.update(id: tx.id, amount: amount, category: category)
+            if let i = transactions.firstIndex(where: { $0.id == tx.id }) {
+                transactions[i].amount = amount
+                transactions[i].category = category
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func delete(_ tx: Transaction) async {
+        do {
+            try await ExpenseAPI.delete(id: tx.id)
+            transactions.removeAll { $0.id == tx.id }
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -44,7 +44,7 @@ struct ContentView: View {
                 SettingsView { Task { await store.load() } }
             }
             .sheet(isPresented: $capture.isPresenting) {
-                CaptureSheet(store: store, initialAmount: capture.amount)
+                CaptureSheet(store: store, initialAmount: capture.amount, editing: capture.editing)
             }
             .task {
                 if Settings.isConfigured { await store.load() }
@@ -66,22 +66,17 @@ struct CategoryStyle {
 
     static func of(_ name: String) -> CategoryStyle {
         switch name {
-        case "Ciggs":         return .init(icon: "smoke.fill", color: .gray)
-        case "Groceries":     return .init(icon: "cart.fill", color: .green)
-        case "Rent":          return .init(icon: "house.fill", color: .brown)
-        case "Cab":           return .init(icon: "car.fill", color: .blue)
+        case "Cab":                   return .init(icon: "car.fill", color: .blue)
+        case "Sutta", "Ciggs":        return .init(icon: "smoke.fill", color: .gray)
+        case "Groceries":             return .init(icon: "cart.fill", color: .green)
+        case "Outing":                return .init(icon: "party.popper.fill", color: .purple)
+        case "Rent":                  return .init(icon: "house.fill", color: .brown)
+        case "Others", "Other":       return .init(icon: "ellipsis.circle.fill", color: .gray)
         case "Food", "Food & Dining": return .init(icon: "fork.knife", color: .orange)
-        case "Shopping":      return .init(icon: "bag.fill", color: .pink)
-        case "Bills":         return .init(icon: "bolt.fill", color: .yellow)
-        case "Health":        return .init(icon: "cross.case.fill", color: .red)
-        case "Entertainment": return .init(icon: "tv.fill", color: .purple)
-        case "Travel":        return .init(icon: "airplane", color: .teal)
-        case "Transport":     return .init(icon: "bus.fill", color: .blue)
-        case "Transfers":     return .init(icon: "arrow.left.arrow.right", color: .indigo)
-        case "Income":        return .init(icon: "arrow.down.circle.fill", color: .green)
-        case "Other":         return .init(icon: "ellipsis.circle.fill", color: .gray)
-        case "Uncategorized": return .init(icon: "questionmark.circle.fill", color: .gray)
-        default:              return .init(icon: "tag.fill", color: stableColor(name))
+        case "Shopping":              return .init(icon: "bag.fill", color: .pink)
+        case "Income":                return .init(icon: "arrow.down.circle.fill", color: .green)
+        case "Uncategorized":         return .init(icon: "questionmark.circle.fill", color: .gray)
+        default:                      return .init(icon: "tag.fill", color: stableColor(name))
         }
     }
 
@@ -98,10 +93,6 @@ struct DashboardView: View {
     @ObservedObject var store: Store
     @State private var monthOnly = true
     @State private var selectedCategory: String?   // nil = All
-
-    private var categories: [String] {
-        store.breakdown(monthOnly: monthOnly).map { $0.name }
-    }
 
     private var visibleTransactions: [Transaction] {
         store.filtered(monthOnly: monthOnly, category: selectedCategory)
@@ -129,7 +120,7 @@ struct DashboardView: View {
                 }
                 .pickerStyle(.segmented)
 
-                CategoryFilterBar(categories: categories, selected: $selectedCategory)
+                CategoryFilterBar(categories: quickPickCategories, selected: $selectedCategory)
 
                 TransactionListCard(store: store,
                                     transactions: visibleTransactions,
@@ -138,10 +129,6 @@ struct DashboardView: View {
             .padding(16)
         }
         .background(Color(.systemGroupedBackground))
-        // If the selected category disappears (scope change), reset to All.
-        .onChange(of: monthOnly) { _, _ in
-            if let sel = selectedCategory, !categories.contains(sel) { selectedCategory = nil }
-        }
     }
 }
 
@@ -289,12 +276,15 @@ struct TransactionRow: View {
         .padding(.vertical, 10)
         .contentShape(Rectangle())
         .contextMenu {
-            ForEach(allCategories, id: \.self) { c in
-                Button {
-                    Task { await store.recategorize(tx, to: c) }
-                } label: {
-                    Label(c, systemImage: CategoryStyle.of(c).icon)
-                }
+            Button {
+                CaptureCoordinator.shared.beginEdit(tx)
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            Button(role: .destructive) {
+                Task { await store.delete(tx) }
+            } label: {
+                Label("Delete", systemImage: "trash")
             }
         }
     }
