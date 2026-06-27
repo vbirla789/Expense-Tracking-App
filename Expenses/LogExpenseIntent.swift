@@ -79,7 +79,9 @@ struct OpenCaptureIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult {
-        CaptureCoordinator.stash(amount)
+        let amt = amount
+        CaptureCoordinator.stash(amt)                       // fallback (cross-process)
+        await MainActor.run { CaptureCoordinator.shared.begin(amount: amt) }  // direct (reliable)
         return .result()
     }
 }
