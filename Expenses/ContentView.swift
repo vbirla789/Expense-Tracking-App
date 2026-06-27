@@ -9,9 +9,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if Settings.isConfigured {
-                    DashboardView(store: store)
-                } else {
+                if !Settings.isConfigured {
                     ContentUnavailableView {
                         Label("Not connected", systemImage: "link")
                     } description: {
@@ -20,6 +18,15 @@ struct ContentView: View {
                         Button("Open Settings") { showSettings = true }
                             .buttonStyle(.borderedProminent)
                     }
+                } else if !store.hasLoaded {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                        Text("Loading your expenses…")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    DashboardView(store: store)
                 }
             }
             .navigationTitle("Expenses")
@@ -63,7 +70,7 @@ struct CategoryStyle {
         case "Groceries":     return .init(icon: "cart.fill", color: .green)
         case "Rent":          return .init(icon: "house.fill", color: .brown)
         case "Cab":           return .init(icon: "car.fill", color: .blue)
-        case "Food":          return .init(icon: "fork.knife", color: .orange)
+        case "Food", "Food & Dining": return .init(icon: "fork.knife", color: .orange)
         case "Shopping":      return .init(icon: "bag.fill", color: .pink)
         case "Bills":         return .init(icon: "bolt.fill", color: .yellow)
         case "Health":        return .init(icon: "cross.case.fill", color: .red)
@@ -78,7 +85,6 @@ struct CategoryStyle {
         }
     }
 
-    /// Deterministic colour for custom categories so they look consistent.
     private static func stableColor(_ s: String) -> Color {
         let palette: [Color] = [.blue, .green, .orange, .pink, .purple, .red, .teal, .indigo, .mint, .cyan]
         let sum = s.unicodeScalars.reduce(0) { $0 + Int($1.value) }
@@ -91,14 +97,22 @@ struct CategoryStyle {
 struct DashboardView: View {
     @ObservedObject var store: Store
     @State private var monthOnly = true
+    @State private var selectedCategory: String?   // nil = All
+
+    private var categories: [String] {
+        store.breakdown(monthOnly: monthOnly).map { $0.name }
+    }
+
+    private var visibleTransactions: [Transaction] {
+        store.filtered(monthOnly: monthOnly, category: selectedCategory)
+    }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: 16) {
                 if let error = store.errorMessage {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                        .font(.footnote).foregroundStyle(.red)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
                         .background(Color.red.opacity(0.1))
@@ -107,7 +121,7 @@ struct DashboardView: View {
 
                 HeroSummary(total: store.total(monthOnly: monthOnly),
                             monthOnly: monthOnly,
-                            count: store.transactions.count)
+                            count: store.filtered(monthOnly: monthOnly, category: nil).count)
 
                 Picker("Scope", selection: $monthOnly) {
                     Text("This month").tag(true)
@@ -115,16 +129,19 @@ struct DashboardView: View {
                 }
                 .pickerStyle(.segmented)
 
-                let items = store.breakdown(monthOnly: monthOnly)
-                if !items.isEmpty {
-                    CategoryBreakdownCard(store: store, items: items, monthOnly: monthOnly)
-                }
+                CategoryFilterBar(categories: categories, selected: $selectedCategory)
 
-                RecentCard(store: store)
+                TransactionListCard(store: store,
+                                    transactions: visibleTransactions,
+                                    category: selectedCategory)
             }
             .padding(16)
         }
         .background(Color(.systemGroupedBackground))
+        // If the selected category disappears (scope change), reset to All.
+        .onChange(of: monthOnly) { _, _ in
+            if let sel = selectedCategory, !categories.contains(sel) { selectedCategory = nil }
+        }
     }
 }
 
@@ -163,72 +180,82 @@ struct HeroSummary: View {
     }
 }
 
-struct CategoryBreakdownCard: View {
-    @ObservedObject var store: Store
-    let items: [(name: String, amount: Double)]
-    let monthOnly: Bool
+// MARK: - Horizontal filter pills (District-style)
+
+struct CategoryFilterBar: View {
+    let categories: [String]
+    @Binding var selected: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("By category — tap to filter")
-                .font(.headline)
-
-            let maxAmount = items.first?.amount ?? 1
-            ForEach(items, id: \.name) { item in
-                NavigationLink {
-                    CategoryDetailView(store: store, category: item.name, monthOnly: monthOnly)
-                } label: {
-                    row(item, maxAmount: maxAmount)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                chip(title: "All", icon: "square.grid.2x2", color: .accentColor, isOn: selected == nil) {
+                    selected = nil
                 }
-                .buttonStyle(.plain)
-            }
-        }
-        .cardStyle()
-    }
-
-    private func row(_ item: (name: String, amount: Double), maxAmount: Double) -> some View {
-        let style = CategoryStyle.of(item.name)
-        return HStack(spacing: 12) {
-            iconBubble(style)
-            VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    Text(item.name).font(.subheadline)
-                    Spacer()
-                    Text(inr(item.amount)).font(.subheadline.weight(.semibold))
-                    Image(systemName: "chevron.right")
-                        .font(.caption2).foregroundStyle(.tertiary)
-                }
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color(.systemGray5))
-                        Capsule().fill(style.color)
-                            .frame(width: geo.size.width * CGFloat(maxAmount > 0 ? item.amount / maxAmount : 0))
+                ForEach(categories, id: \.self) { c in
+                    let style = CategoryStyle.of(c)
+                    chip(title: c, icon: style.icon, color: style.color, isOn: selected == c) {
+                        selected = (selected == c) ? nil : c
                     }
                 }
-                .frame(height: 6)
             }
+            .padding(.horizontal, 2)
+            .padding(.vertical, 2)
         }
+    }
+
+    private func chip(title: String, icon: String, color: Color, isOn: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon).font(.caption2)
+                Text(title).font(.subheadline.weight(.medium))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(isOn ? color : color.opacity(0.15))
+            .foregroundStyle(isOn ? Color.white : color)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }
 
-struct RecentCard: View {
+// MARK: - Transactions
+
+struct TransactionListCard: View {
     @ObservedObject var store: Store
+    let transactions: [Transaction]
+    let category: String?
+
+    private var total: Double {
+        transactions.reduce(0) { $0 + ($1.category == "Income" ? 0 : $1.amount) }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Recent")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(category ?? "All transactions")
+                    .font(.headline)
+                Spacer()
+                if category != nil {
+                    Text(inr(total))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.bottom, 6)
 
-            if store.transactions.isEmpty {
-                Text(store.isLoading ? "Loading…" : "No transactions yet. Tap + or set up the Shortcut to start logging.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            if transactions.isEmpty {
+                Text(store.isLoading ? "Loading…" : "No transactions here yet.")
+                    .font(.subheadline).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 16)
             } else {
-                ForEach(Array(store.transactions.prefix(50).enumerated()), id: \.element.id) { idx, tx in
-                    if idx > 0 { Divider().padding(.leading, 52) }
-                    TransactionRow(tx: tx, store: store)
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(transactions.prefix(100).enumerated()), id: \.element.id) { idx, tx in
+                        if idx > 0 { Divider().padding(.leading, 52) }
+                        TransactionRow(tx: tx, store: store)
+                    }
                 }
             }
         }
@@ -246,38 +273,30 @@ struct TransactionRow: View {
             iconBubble(style)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(tx.merchant.isEmpty ? "(no merchant)" : tx.merchant)
+                Text(tx.category)
                     .font(.subheadline.weight(.medium))
-                Menu {
-                    ForEach(allCategories, id: \.self) { c in
-                        Button {
-                            Task { await store.recategorize(tx, to: c) }
-                        } label: {
-                            Label(c, systemImage: CategoryStyle.of(c).icon)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 3) {
-                        Text(tx.category)
-                        Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
-                    }
+                Text(tx.date.formatted(date: .abbreviated, time: .omitted))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                }
             }
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 3) {
-                Text((tx.category == "Income" ? "+" : "") + inr(tx.amount))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(tx.category == "Income" ? Color.green : Color.primary)
-                Text(tx.date.formatted(date: .abbreviated, time: .omitted))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+            Text((tx.category == "Income" ? "+" : "") + inr(tx.amount))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(tx.category == "Income" ? Color.green : Color.primary)
+        }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+        .contextMenu {
+            ForEach(allCategories, id: \.self) { c in
+                Button {
+                    Task { await store.recategorize(tx, to: c) }
+                } label: {
+                    Label(c, systemImage: CategoryStyle.of(c).icon)
+                }
             }
         }
-        .padding(.vertical, 9)
     }
 }
 
@@ -305,6 +324,7 @@ extension View {
 
 #Preview("Dashboard") {
     let store = Store()
+    store.hasLoaded = true
     store.transactions = [
         Transaction(id: "1", timestamp: "2026-06-25T09:00:00Z", amount: 450,
                     merchant: "Swiggy", category: "Food", source: "sms", raw: ""),

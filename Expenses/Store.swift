@@ -6,15 +6,23 @@ import Combine
 final class Store: ObservableObject {
     @Published var transactions: [Transaction] = []
     @Published var isLoading = false
+    @Published var hasLoaded = false
     @Published var errorMessage: String?
 
     func load() async {
         isLoading = true
-        errorMessage = nil
         do {
-            transactions = try await ExpenseAPI.fetchAll().sorted { $0.date > $1.date }
+            let fetched = try await ExpenseAPI.fetchAll().sorted { $0.date > $1.date }
+            transactions = fetched
+            errorMessage = nil
+            hasLoaded = true
+        } catch is CancellationError {
+            // Ignore — a newer load cancelled this one; not a real error.
+        } catch let urlError as URLError where urlError.code == .cancelled {
+            // Same: cancelled request, not a failure to surface.
         } catch {
             errorMessage = error.localizedDescription
+            hasLoaded = true
         }
         isLoading = false
     }
@@ -80,5 +88,13 @@ final class Store: ObservableObject {
     /// All transactions in one category, for the drill-down filter view.
     func transactions(in category: String, monthOnly: Bool) -> [Transaction] {
         transactions.filter { $0.category == category && (!monthOnly || isThisMonth($0.date)) }
+    }
+
+    /// Transactions for the current scope, optionally filtered to one category
+    /// (category == nil means "All"). Used by the inline filter pills.
+    func filtered(monthOnly: Bool, category: String?) -> [Transaction] {
+        transactions.filter { tx in
+            (!monthOnly || isThisMonth(tx.date)) && (category == nil || tx.category == category)
+        }
     }
 }
