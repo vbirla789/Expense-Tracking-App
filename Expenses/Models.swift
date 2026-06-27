@@ -30,11 +30,14 @@ struct DataResponse: Codable {
     let error: String?
 }
 
-/// The category list — keep in sync with the Shortcut menu and the PWA.
-let allCategories = [
-    "Food & Dining", "Groceries", "Transport", "Shopping", "Bills & Utilities",
-    "Entertainment", "Health", "Rent", "Travel", "Transfers", "Income", "Other", "Uncategorized"
+/// Quick-pick category pills shown in the capture sheet. Edit freely.
+let quickPickCategories = [
+    "Ciggs", "Groceries", "Rent", "Cab", "Food",
+    "Shopping", "Bills", "Health", "Entertainment", "Travel"
 ]
+
+/// Full category list for the re-categorize menu (pills + a few extras).
+let allCategories = quickPickCategories + ["Transport", "Transfers", "Income", "Other", "Uncategorized"]
 
 /// Format a rupee amount with no decimals, e.g. ₹4,239.
 func inr(_ value: Double) -> String {

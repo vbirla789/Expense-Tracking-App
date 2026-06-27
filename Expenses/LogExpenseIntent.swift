@@ -63,6 +63,27 @@ struct LogExpenseIntent: AppIntent {
     }
 }
 
+/// Opens the app to the capture bottom sheet with the amount pre-filled.
+/// Use this in your transaction automation: pass the parsed Amount, and the
+/// app pops the sheet so you tap a category pill and Save.
+struct OpenCaptureIntent: AppIntent {
+    static var title: LocalizedStringResource = "Capture Expense (with popup)"
+    static var description = IntentDescription("Opens the app to log a transaction, with the amount filled in.")
+    static var openAppWhenRun = true
+
+    @Parameter(title: "Amount")
+    var amount: Double
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Capture \(\.$amount) in the app")
+    }
+
+    func perform() async throws -> some IntentResult {
+        CaptureCoordinator.stash(amount)
+        return .result()
+    }
+}
+
 /// Surfaces the intent in the Shortcuts app and to Siri automatically.
 struct ExpensesShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {

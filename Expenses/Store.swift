@@ -58,10 +58,27 @@ final class Store: ObservableObject {
 
     /// (category, total) for the current month, biggest first.
     var categoryBreakdown: [(name: String, amount: Double)] {
+        breakdown(monthOnly: true)
+    }
+
+    // MARK: - Scoped queries (monthOnly == true → this month, false → all time)
+
+    /// Total spend for the chosen scope.
+    func total(monthOnly: Bool) -> Double {
+        spend.filter { !monthOnly || isThisMonth($0.date) }.reduce(0) { $0 + $1.amount }
+    }
+
+    /// (category, total) for the chosen scope, biggest first.
+    func breakdown(monthOnly: Bool) -> [(name: String, amount: Double)] {
         var dict: [String: Double] = [:]
-        for t in spend where isThisMonth(t.date) {
+        for t in spend where (!monthOnly || isThisMonth(t.date)) {
             dict[t.category, default: 0] += t.amount
         }
         return dict.sorted { $0.value > $1.value }.map { (name: $0.key, amount: $0.value) }
+    }
+
+    /// All transactions in one category, for the drill-down filter view.
+    func transactions(in category: String, monthOnly: Bool) -> [Transaction] {
+        transactions.filter { $0.category == category && (!monthOnly || isThisMonth($0.date)) }
     }
 }

@@ -2,7 +2,8 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var store = Store()
-    @State private var showAdd = false
+    @StateObject private var capture = CaptureCoordinator.shared
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showSettings = false
 
     var body: some View {
@@ -28,21 +29,29 @@ struct ContentView: View {
                     Button { showSettings = true } label: { Image(systemName: "gearshape") }
                 }
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { showAdd = true } label: { Image(systemName: "plus.circle.fill") }
+                    Button { capture.begin(amount: nil) } label: { Image(systemName: "plus.circle.fill") }
                         .disabled(!Settings.isConfigured)
                 }
             }
-            .sheet(isPresented: $showAdd) { AddExpenseView(store: store) }
             .sheet(isPresented: $showSettings) {
                 SettingsView { Task { await store.load() } }
             }
-            .task { if Settings.isConfigured { await store.load() } }
+            .sheet(isPresented: $capture.isPresenting) {
+                CaptureSheet(store: store, initialAmount: capture.amount)
+            }
+            .task {
+                if Settings.isConfigured { await store.load() }
+                capture.consumePending()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { capture.consumePending() }
+            }
             .refreshable { await store.load() }
         }
     }
 }
 
-// MARK: - Per-category icon + colour
+// MARK: - Per-category icon + colour (handles custom categories too)
 
 struct CategoryStyle {
     let icon: String
@@ -50,20 +59,30 @@ struct CategoryStyle {
 
     static func of(_ name: String) -> CategoryStyle {
         switch name {
-        case "Food & Dining":     return .init(icon: "fork.knife", color: .orange)
-        case "Groceries":         return .init(icon: "cart.fill", color: .green)
-        case "Transport":         return .init(icon: "car.fill", color: .blue)
-        case "Shopping":          return .init(icon: "bag.fill", color: .pink)
-        case "Bills & Utilities": return .init(icon: "bolt.fill", color: .yellow)
-        case "Entertainment":     return .init(icon: "tv.fill", color: .purple)
-        case "Health":            return .init(icon: "cross.case.fill", color: .red)
-        case "Rent":              return .init(icon: "house.fill", color: .brown)
-        case "Travel":            return .init(icon: "airplane", color: .teal)
-        case "Transfers":         return .init(icon: "arrow.left.arrow.right", color: .indigo)
-        case "Income":            return .init(icon: "arrow.down.circle.fill", color: .green)
-        case "Other":             return .init(icon: "ellipsis.circle.fill", color: .gray)
-        default:                  return .init(icon: "questionmark.circle.fill", color: .gray)
+        case "Ciggs":         return .init(icon: "smoke.fill", color: .gray)
+        case "Groceries":     return .init(icon: "cart.fill", color: .green)
+        case "Rent":          return .init(icon: "house.fill", color: .brown)
+        case "Cab":           return .init(icon: "car.fill", color: .blue)
+        case "Food":          return .init(icon: "fork.knife", color: .orange)
+        case "Shopping":      return .init(icon: "bag.fill", color: .pink)
+        case "Bills":         return .init(icon: "bolt.fill", color: .yellow)
+        case "Health":        return .init(icon: "cross.case.fill", color: .red)
+        case "Entertainment": return .init(icon: "tv.fill", color: .purple)
+        case "Travel":        return .init(icon: "airplane", color: .teal)
+        case "Transport":     return .init(icon: "bus.fill", color: .blue)
+        case "Transfers":     return .init(icon: "arrow.left.arrow.right", color: .indigo)
+        case "Income":        return .init(icon: "arrow.down.circle.fill", color: .green)
+        case "Other":         return .init(icon: "ellipsis.circle.fill", color: .gray)
+        case "Uncategorized": return .init(icon: "questionmark.circle.fill", color: .gray)
+        default:              return .init(icon: "tag.fill", color: stableColor(name))
         }
+    }
+
+    /// Deterministic colour for custom categories so they look consistent.
+    private static func stableColor(_ s: String) -> Color {
+        let palette: [Color] = [.blue, .green, .orange, .pink, .purple, .red, .teal, .indigo, .mint, .cyan]
+        let sum = s.unicodeScalars.reduce(0) { $0 + Int($1.value) }
+        return palette[sum % palette.count]
     }
 }
 
@@ -71,6 +90,7 @@ struct CategoryStyle {
 
 struct DashboardView: View {
     @ObservedObject var store: Store
+    @State private var monthOnly = true
 
     var body: some View {
         ScrollView {
@@ -85,12 +105,19 @@ struct DashboardView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
 
-                HeroSummary(month: store.monthSpend,
-                            allTime: store.allTimeSpend,
+                HeroSummary(total: store.total(monthOnly: monthOnly),
+                            monthOnly: monthOnly,
                             count: store.transactions.count)
 
-                if !store.categoryBreakdown.isEmpty {
-                    CategoryBreakdownCard(items: store.categoryBreakdown)
+                Picker("Scope", selection: $monthOnly) {
+                    Text("This month").tag(true)
+                    Text("All time").tag(false)
+                }
+                .pickerStyle(.segmented)
+
+                let items = store.breakdown(monthOnly: monthOnly)
+                if !items.isEmpty {
+                    CategoryBreakdownCard(store: store, items: items, monthOnly: monthOnly)
                 }
 
                 RecentCard(store: store)
@@ -102,31 +129,28 @@ struct DashboardView: View {
 }
 
 struct HeroSummary: View {
-    let month: Double
-    let allTime: Double
+    let total: Double
+    let monthOnly: Bool
     let count: Int
 
-    private var monthName: String {
-        Date().formatted(.dateTime.month(.wide))
+    private var label: String {
+        monthOnly ? "Spent in \(Date().formatted(.dateTime.month(.wide)))" : "Spent all time"
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Spent in \(monthName)")
+            Text(label)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.white.opacity(0.85))
 
-            Text(inr(month))
+            Text(inr(total))
                 .font(.system(size: 42, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
 
-            HStack(spacing: 16) {
-                Label(inr(allTime), systemImage: "sum")
-                Label("\(count) transactions", systemImage: "list.bullet")
-            }
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.white.opacity(0.9))
-            .padding(.top, 6)
+            Label("\(count) transactions", systemImage: "list.bullet")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.9))
+                .padding(.top, 6)
         }
         .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -140,37 +164,50 @@ struct HeroSummary: View {
 }
 
 struct CategoryBreakdownCard: View {
+    @ObservedObject var store: Store
     let items: [(name: String, amount: Double)]
+    let monthOnly: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("By category")
+        VStack(alignment: .leading, spacing: 14) {
+            Text("By category — tap to filter")
                 .font(.headline)
 
             let maxAmount = items.first?.amount ?? 1
             ForEach(items, id: \.name) { item in
-                let style = CategoryStyle.of(item.name)
-                HStack(spacing: 12) {
-                    iconBubble(style)
-                    VStack(alignment: .leading, spacing: 5) {
-                        HStack {
-                            Text(item.name).font(.subheadline)
-                            Spacer()
-                            Text(inr(item.amount)).font(.subheadline.weight(.semibold))
-                        }
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(Color(.systemGray5))
-                                Capsule().fill(style.color)
-                                    .frame(width: geo.size.width * CGFloat(maxAmount > 0 ? item.amount / maxAmount : 0))
-                            }
-                        }
-                        .frame(height: 6)
-                    }
+                NavigationLink {
+                    CategoryDetailView(store: store, category: item.name, monthOnly: monthOnly)
+                } label: {
+                    row(item, maxAmount: maxAmount)
                 }
+                .buttonStyle(.plain)
             }
         }
         .cardStyle()
+    }
+
+    private func row(_ item: (name: String, amount: Double), maxAmount: Double) -> some View {
+        let style = CategoryStyle.of(item.name)
+        return HStack(spacing: 12) {
+            iconBubble(style)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text(item.name).font(.subheadline)
+                    Spacer()
+                    Text(inr(item.amount)).font(.subheadline.weight(.semibold))
+                    Image(systemName: "chevron.right")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color(.systemGray5))
+                        Capsule().fill(style.color)
+                            .frame(width: geo.size.width * CGFloat(maxAmount > 0 ? item.amount / maxAmount : 0))
+                    }
+                }
+                .frame(height: 6)
+            }
+        }
     }
 }
 
@@ -183,7 +220,7 @@ struct RecentCard: View {
                 .font(.headline)
 
             if store.transactions.isEmpty {
-                Text(store.isLoading ? "Loading…" : "No transactions yet. They'll appear here as your Shortcut logs them.")
+                Text(store.isLoading ? "Loading…" : "No transactions yet. Tap + or set up the Shortcut to start logging.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -270,13 +307,13 @@ extension View {
     let store = Store()
     store.transactions = [
         Transaction(id: "1", timestamp: "2026-06-25T09:00:00Z", amount: 450,
-                    merchant: "Swiggy", category: "Food & Dining", source: "sms", raw: ""),
+                    merchant: "Swiggy", category: "Food", source: "sms", raw: ""),
         Transaction(id: "2", timestamp: "2026-06-25T08:00:00Z", amount: 1200,
                     merchant: "BigBasket", category: "Groceries", source: "sms", raw: ""),
         Transaction(id: "3", timestamp: "2026-06-24T19:00:00Z", amount: 89,
-                    merchant: "Uber", category: "Transport", source: "apple pay", raw: ""),
-        Transaction(id: "4", timestamp: "2026-06-23T13:00:00Z", amount: 2500,
-                    merchant: "Amazon", category: "Shopping", source: "sms", raw: "")
+                    merchant: "Uber", category: "Cab", source: "apple pay", raw: ""),
+        Transaction(id: "4", timestamp: "2026-06-23T13:00:00Z", amount: 300,
+                    merchant: "Pan shop", category: "Ciggs", source: "sms", raw: "")
     ]
     return NavigationStack { DashboardView(store: store) }
 }
