@@ -62,13 +62,12 @@ struct CaptureSheet: View {
         }
         .scrollContentBackground(.hidden)
         .scrollBounceBehavior(.basedOnSize)
-        .sheet(isPresented: $showContacts, onDismiss: {
-            if splitPeople.isEmpty { isSplit = false }
-        }) {
-            ContactPickerView(preselected: splitPeople) { names in
-                withAnimation(.snappy(duration: 0.28)) { splitPeople = names }
+        .background(
+            ContactPickerPresenter(isPresented: $showContacts) { names in
+                if !names.isEmpty { withAnimation(.snappy(duration: 0.28)) { splitPeople = names } }
+                if splitPeople.isEmpty { isSplit = false }
             }
-        }
+        )
         .safeAreaInset(edge: .bottom) {
             saveButton
                 .padding(.horizontal, 16)
