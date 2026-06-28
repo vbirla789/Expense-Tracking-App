@@ -28,13 +28,18 @@ struct CaptureSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    amountField
-                    pillGrid
-                    customField
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 24) {
+                        amountField
+                        pillGrid
+                        customField
+                    }
+                    .padding()
                 }
-                .padding()
+                .scrollContentBackground(.hidden)
+
+                saveBar
             }
             .navigationTitle(isEditing ? "Edit expense" : "New expense")
             .navigationBarTitleDisplayMode(.inline)
@@ -43,8 +48,6 @@ struct CaptureSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
-            .safeAreaInset(edge: .bottom) { saveBar }
-            .scrollContentBackground(.hidden)
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
@@ -137,19 +140,19 @@ struct CaptureSheet: View {
         Button(action: save) {
             Text(saving ? "Saving…" : (isEditing ? "Save changes" : "Save expense"))
                 .font(.headline)
-                .foregroundStyle(.white)
+                .foregroundStyle(canSave ? Color.white : Color.secondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)                       // CTA height: 52pt
                 .background(
-                    Color.accentColor.opacity(canSave ? 1 : 0.45),
+                    canSave ? Color.accentColor : Color(.systemGray5),   // solid grey when disabled
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
         }
         .buttonStyle(.plain)
         .disabled(!canSave)
         .padding(.horizontal, 16)
-        .padding(.top, 16)
-        .padding(.bottom, 24)                            // 24pt from the bottom
+        .padding(.top, 12)
+        .padding(.bottom, 32)                            // 32pt from the bottom
         .background(progressiveBlur)
     }
 
