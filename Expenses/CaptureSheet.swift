@@ -134,29 +134,54 @@ struct CaptureSheet: View {
     }
 
     private var saveBar: some View {
-        Button {
-            guard let amt = amountValue else { return }
-            saving = true
-            Task {
-                if let tx = editing {
-                    await store.edit(tx, amount: amt, category: chosenCategory)
-                } else {
-                    await store.add(amount: amt, merchant: "", category: chosenCategory)
-                }
-                dismiss()
-            }
-        } label: {
+        Button(action: save) {
             Text(saving ? "Saving…" : (isEditing ? "Save changes" : "Save expense"))
                 .font(.headline)
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
+                .frame(height: 52)                       // CTA height: 52pt
+                .background(
+                    Color.accentColor.opacity(canSave ? 1 : 0.45),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .tint(Color.accentColor)
+        .buttonStyle(.plain)
         .disabled(!canSave)
-        .padding()
-        .background(.ultraThinMaterial)
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 24)                            // 24pt from the bottom
+        .background(progressiveBlur)
+    }
+
+    /// Variable "progressive" blur — frosted at the bottom, fading to clear
+    /// upward, like the bottom bars in Apple Music / Maps.
+    private var progressiveBlur: some View {
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0.0),
+                        .init(color: .black.opacity(0.6), location: 0.3),
+                        .init(color: .black, location: 0.7)
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+            )
+            .ignoresSafeArea()
+    }
+
+    private func save() {
+        guard let amt = amountValue else { return }
+        saving = true
+        Task {
+            if let tx = editing {
+                await store.edit(tx, amount: amt, category: chosenCategory)
+            } else {
+                await store.add(amount: amt, merchant: "", category: chosenCategory)
+            }
+            dismiss()
+        }
     }
 
     private func trimmed(_ d: Double) -> String {

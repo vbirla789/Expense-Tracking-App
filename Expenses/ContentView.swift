@@ -317,9 +317,9 @@ extension View {
     /// Frosted-glass panel with a subtle edge highlight (glassmorphism).
     func glassCard(cornerRadius: CGFloat) -> some View {
         self
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(.white.opacity(0.22), lineWidth: 1)
             )
     }
