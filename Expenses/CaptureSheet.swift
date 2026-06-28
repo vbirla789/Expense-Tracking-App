@@ -71,7 +71,7 @@ struct CaptureSheet: View {
         )
         .presentationDetents([.height(sheetHeight)])
         .presentationDragIndicator(.visible)
-        .presentationBackground(.ultraThinMaterial)
+        .presentationBackground(Color(.systemGroupedBackground))
         .onAppear(perform: prefill)
         .onChange(of: isSplit) { _, on in
             if on && splitPeople.isEmpty { showContacts = true }
@@ -179,30 +179,26 @@ struct CaptureSheet: View {
             .tint(Color.accentColor)
 
             if isSplit && !splitPeople.isEmpty {
-                Button { showContacts = true } label: {
-                    HStack {
-                        Image(systemName: "person.crop.circle.badge.plus")
-                        Text("Split between you + \(splitPeople.count)")
-                        Spacer()
-                        Image(systemName: "pencil").font(.caption2).foregroundStyle(.secondary)
-                    }
-                    .font(.subheadline)
-                    .padding(12)
-                    .background(Color(.secondarySystemGroupedBackground),
-                                in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-                .buttonStyle(.plain)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(splitPeople, id: \.self) { name in
-                            Text(name)
-                                .font(.caption)
-                                .padding(.horizontal, 10).padding(.vertical, 5)
-                                .background(Color.accentColor.opacity(0.15), in: Capsule())
-                                .foregroundStyle(Color.accentColor)
+                HStack(spacing: 8) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(splitPeople, id: \.self) { name in
+                                Text(name)
+                                    .font(.subheadline)
+                                    .padding(.horizontal, 12).padding(.vertical, 7)
+                                    .background(Color.accentColor.opacity(0.15), in: Capsule())
+                                    .foregroundStyle(Color.accentColor)
+                            }
                         }
                     }
+                    Button { showContacts = true } label: {
+                        Image(systemName: "pencil")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 36, height: 36)
+                            .background(Color(.tertiarySystemGroupedBackground), in: Circle())
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 if let share = shareAmount {
@@ -212,7 +208,6 @@ struct CaptureSheet: View {
                         Text(inr(share)).fontWeight(.semibold)
                     }
                     .font(.subheadline)
-                    .padding(.top, 2)
                 }
             }
         }
@@ -226,7 +221,7 @@ struct CaptureSheet: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
                 .background(
-                    canSave ? Color.accentColor : Color(.systemGray5),
+                    canSave ? Color.accentColor : Color(.systemGray3),
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
         }
