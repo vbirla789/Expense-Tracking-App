@@ -20,12 +20,6 @@ struct CaptureSheet: View {
     private var amountValue: Double? { Double(amount) }
     private var isSplitting: Bool { isSplit && !splitPeople.isEmpty }
 
-    /// Your share = bill ÷ (the people you picked + you).
-    private var shareAmount: Double? {
-        guard let amt = amountValue else { return nil }
-        return isSplitting ? amt / Double(splitPeople.count + 1) : amt
-    }
-
     private var showCustom: Bool { selected == "Others" }
 
     private var chosenCategory: String {
@@ -60,18 +54,21 @@ struct CaptureSheet: View {
                 GeometryReader { geo in
                     Color.clear
                         .onAppear { formHeight = geo.size.height }
-                        .onChange(of: geo.size.height) { _, h in formHeight = h }
+                        .onChange(of: geo.size.height) { _, h in
+                            withAnimation(.easeInOut(duration: 0.22)) { formHeight = h }
+                        }
                 }
             )
         }
         .scrollContentBackground(.hidden)
         .scrollBounceBehavior(.basedOnSize)
-        .background(
-            ContactPickerPresenter(isPresented: $showContacts) { names in
-                if !names.isEmpty { splitPeople = names }
-                if splitPeople.isEmpty { isSplit = false }
+        .sheet(isPresented: $showContacts, onDismiss: {
+            if splitPeople.isEmpty { isSplit = false }
+        }) {
+            ContactPickerView(preselected: splitPeople) { names in
+                withAnimation(.snappy(duration: 0.28)) { splitPeople = names }
             }
-        )
+        }
         .safeAreaInset(edge: .bottom) {
             saveButton
                 .padding(.horizontal, 16)
@@ -96,6 +93,10 @@ struct CaptureSheet: View {
             } else {
                 selected = "Others"
                 custom = tx.category
+            }
+            if tx.isSplit {
+                isSplit = true
+                splitPeople = tx.splitNames
             }
         } else if let a = initialAmount, a > 0 {
             amount = trimmed(a)
@@ -210,15 +211,6 @@ struct CaptureSheet: View {
                     }
                     .buttonStyle(.plain)
                 }
-
-                if let share = shareAmount {
-                    HStack {
-                        Text("Your share").foregroundStyle(.secondary)
-                        Spacer()
-                        Text(inr(share)).fontWeight(.semibold)
-                    }
-                    .font(.subheadline)
-                }
             }
         }
     }
@@ -240,14 +232,14 @@ struct CaptureSheet: View {
     }
 
     private func save() {
-        guard let finalAmount = shareAmount else { return }
+        guard let amt = amountValue else { return }   // store the FULL bill; share is derived
         let note = isSplitting ? "split|" + splitPeople.joined(separator: ", ") : (editing?.raw ?? "")
         saving = true
         Task {
             if let tx = editing {
-                await store.edit(tx, amount: finalAmount, category: chosenCategory, note: note)
+                await store.edit(tx, amount: amt, category: chosenCategory, note: note)
             } else {
-                await store.add(amount: finalAmount, merchant: "", category: chosenCategory, note: note)
+                await store.add(amount: amt, merchant: "", category: chosenCategory, note: note)
             }
             dismiss()
         }

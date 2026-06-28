@@ -218,7 +218,7 @@ struct TransactionListCard: View {
     let category: String?
 
     private var total: Double {
-        transactions.reduce(0) { $0 + ($1.category == "Income" ? 0 : $1.amount) }
+        transactions.reduce(0) { $0 + ($1.category == "Income" ? 0 : $1.effectiveAmount) }
     }
 
     var body: some View {
@@ -281,7 +281,7 @@ struct TransactionRow: View {
 
             Spacer()
 
-            Text((tx.category == "Income" ? "+" : "") + inr(tx.amount))
+            Text((tx.category == "Income" ? "+" : "") + inr(tx.effectiveAmount))
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(tx.category == "Income" ? Color.green : Color.primary)
         }

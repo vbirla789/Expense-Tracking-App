@@ -1,53 +1,93 @@
 import SwiftUI
-import ContactsUI
+@preconcurrency import Contacts
 
-/// Presents Apple's native multi-select contact picker *imperatively* from a
-/// hidden host controller. Presenting it this way (instead of a SwiftUI .sheet)
-/// means dismissing the picker never dismisses the capture sheet behind it.
-/// No contacts permission needed — the system picker returns only who you tick.
-struct ContactPickerPresenter: UIViewControllerRepresentable {
-    @Binding var isPresented: Bool
-    var onSelect: ([String]) -> Void
+struct ContactItem: Identifiable, Hashable {
+    let id: String
+    let name: String
+}
 
-    func makeUIViewController(context: Context) -> UIViewController { UIViewController() }
+@MainActor
+final class ContactsLoader: ObservableObject {
+    @Published var contacts: [ContactItem] = []
+    @Published var denied = false
+    @Published var loading = true
 
-    func updateUIViewController(_ host: UIViewController, context: Context) {
-        context.coordinator.parent = self
-        if isPresented, host.presentedViewController == nil, !context.coordinator.presenting {
-            context.coordinator.presenting = true
-            let picker = CNContactPickerViewController()
-            picker.delegate = context.coordinator
-            host.present(picker, animated: true)
+    func load() {
+        let store = CNContactStore()
+        store.requestAccess(for: .contacts) { granted, _ in
+            if !granted {
+                Task { @MainActor in self.denied = true; self.loading = false }
+                return
+            }
+            let keys = [CNContactGivenNameKey, CNContactFamilyNameKey] as [CNKeyDescriptor]
+            let req = CNContactFetchRequest(keysToFetch: keys)
+            var items: [ContactItem] = []
+            try? store.enumerateContacts(with: req) { c, _ in
+                let formatted = CNContactFormatter.string(from: c, style: .fullName) ?? ""
+                let name = formatted.isEmpty
+                    ? [c.givenName, c.familyName].filter { !$0.isEmpty }.joined(separator: " ")
+                    : formatted
+                let trimmed = name.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty { items.append(ContactItem(id: c.identifier, name: trimmed)) }
+            }
+            items.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            Task { @MainActor in self.contacts = items; self.loading = false }
         }
     }
+}
 
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
+/// Custom contact list with search, checkmarks, and pre-selection.
+struct ContactPickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var loader = ContactsLoader()
+    @State private var search = ""
+    @State private var selected: Set<String>
+    let onDone: ([String]) -> Void
 
-    final class Coordinator: NSObject, CNContactPickerDelegate {
-        var parent: ContactPickerPresenter
-        var presenting = false
-        init(_ parent: ContactPickerPresenter) { self.parent = parent }
+    init(preselected: [String], onDone: @escaping ([String]) -> Void) {
+        _selected = State(initialValue: Set(preselected))
+        self.onDone = onDone
+    }
 
-        func contactPicker(_ picker: CNContactPickerViewController, didSelect contacts: [CNContact]) {
-            parent.onSelect(contacts.map(name))
-            finish()
-        }
+    private var filtered: [ContactItem] {
+        search.isEmpty ? loader.contacts
+            : loader.contacts.filter { $0.name.localizedCaseInsensitiveContains(search) }
+    }
 
-        func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
-            parent.onSelect([])
-            finish()
-        }
-
-        private func finish() {
-            presenting = false
-            parent.isPresented = false
-        }
-
-        private func name(_ c: CNContact) -> String {
-            let full = CNContactFormatter.string(from: c, style: .fullName) ?? ""
-            if !full.isEmpty { return full }
-            let parts = [c.givenName, c.familyName].filter { !$0.isEmpty }
-            return parts.isEmpty ? "Someone" : parts.joined(separator: " ")
+    var body: some View {
+        NavigationStack {
+            Group {
+                if loader.denied {
+                    ContentUnavailableView("No contacts access", systemImage: "person.crop.circle.badge.xmark",
+                        description: Text("Allow Contacts for Expenses in Settings to pick people."))
+                } else if loader.loading {
+                    ProgressView()
+                } else {
+                    List(filtered) { item in
+                        Button {
+                            if selected.contains(item.name) { selected.remove(item.name) }
+                            else { selected.insert(item.name) }
+                        } label: {
+                            HStack {
+                                Text(item.name).foregroundStyle(.primary)
+                                Spacer()
+                                Image(systemName: selected.contains(item.name) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(selected.contains(item.name) ? Color.accentColor : Color.secondary)
+                            }
+                        }
+                    }
+                    .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always))
+                }
+            }
+            .navigationTitle("Split with")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { onDone(Array(selected)); dismiss() }
+                }
+            }
+            .onAppear { if loader.contacts.isEmpty && !loader.denied { loader.load() } }
         }
     }
 }

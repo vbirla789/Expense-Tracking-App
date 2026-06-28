@@ -94,16 +94,16 @@ final class Store: ObservableObject {
 
     // MARK: - Scoped queries (monthOnly == true → this month, false → all time)
 
-    /// Total spend for the chosen scope.
+    /// Total spend for the chosen scope (splits count only your share).
     func total(monthOnly: Bool) -> Double {
-        spend.filter { !monthOnly || isThisMonth($0.date) }.reduce(0) { $0 + $1.amount }
+        spend.filter { !monthOnly || isThisMonth($0.date) }.reduce(0) { $0 + $1.effectiveAmount }
     }
 
     /// (category, total) for the chosen scope, biggest first.
     func breakdown(monthOnly: Bool) -> [(name: String, amount: Double)] {
         var dict: [String: Double] = [:]
         for t in spend where (!monthOnly || isThisMonth(t.date)) {
-            dict[t.category, default: 0] += t.amount
+            dict[t.category, default: 0] += t.effectiveAmount
         }
         return dict.sorted { $0.value > $1.value }.map { (name: $0.key, amount: $0.value) }
     }

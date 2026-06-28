@@ -13,8 +13,18 @@ struct Transaction: Identifiable, Codable, Hashable {
     var date: Date { Transaction.parseDate(timestamp) }
 
     /// Split metadata is stored in `raw` as "split|Name, Name".
+    /// `amount` holds the FULL bill; `effectiveAmount` is your share.
     var isSplit: Bool { raw.hasPrefix("split|") }
     var splitWith: String { isSplit ? String(raw.dropFirst("split|".count)) : "" }
+    var splitNames: [String] {
+        isSplit ? splitWith.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } : []
+    }
+
+    /// What counts toward your spending: your share for splits, else the full amount.
+    var effectiveAmount: Double {
+        let n = splitNames.count
+        return (isSplit && n > 0) ? amount / Double(n + 1) : amount
+    }
 
     /// Apps Script sends ISO8601, sometimes with fractional seconds — handle both.
     static func parseDate(_ s: String) -> Date {
