@@ -34,12 +34,14 @@ enum ExpenseAPI {
     }
 
     static func add(amount: Double, merchant: String, category: String,
-                    source: String, raw: String) async throws {
-        try await post([
+                    source: String, raw: String, timestamp: String? = nil) async throws {
+        var body: [String: Any] = [
             "token": Settings.token, "action": "add",
             "amount": amount, "merchant": merchant, "category": category,
             "source": source, "raw": raw
-        ])
+        ]
+        if let timestamp = timestamp { body["timestamp"] = timestamp }
+        try await post(body)
     }
 
     static func update(id: String, amount: Double?, category: String?) async throws {
@@ -49,10 +51,10 @@ enum ExpenseAPI {
         try await post(body)
     }
 
+    /// "Soft delete": mark the row's category so the app hides it. Uses the
+    /// already-deployed update action, so no Apps Script redeploy is required.
     static func delete(id: String) async throws {
-        try await post([
-            "token": Settings.token, "action": "delete", "id": id
-        ])
+        try await update(id: id, amount: nil, category: deletedCategory)
     }
 
     private static func post(_ body: [String: Any]) async throws {

@@ -13,7 +13,7 @@ final class Store: ObservableObject {
         isLoading = true
         do {
             let fetched = try await ExpenseAPI.fetchAll().sorted { $0.date > $1.date }
-            transactions = fetched
+            transactions = fetched.filter { $0.category != deletedCategory }
             errorMessage = nil
             hasLoaded = true
         } catch is CancellationError {
@@ -50,11 +50,13 @@ final class Store: ObservableObject {
 
     func edit(_ tx: Transaction, amount: Double, category: String) async {
         do {
-            try await ExpenseAPI.update(id: tx.id, amount: amount, category: category)
-            if let i = transactions.firstIndex(where: { $0.id == tx.id }) {
-                transactions[i].amount = amount
-                transactions[i].category = category
-            }
+            // Add a corrected row (preserving the original date), then hide the old one.
+            // Works with the deployed backend without needing an amount-update action.
+            try await ExpenseAPI.add(amount: amount, merchant: tx.merchant,
+                                     category: category, source: tx.source,
+                                     raw: tx.raw, timestamp: tx.timestamp)
+            try await ExpenseAPI.delete(id: tx.id)
+            await load()
         } catch {
             errorMessage = error.localizedDescription
         }

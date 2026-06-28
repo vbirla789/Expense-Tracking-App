@@ -37,6 +37,10 @@ let quickPickCategories = ["Cab", "Sutta", "Groceries", "Outing", "Rent", "Other
 /// Alias kept for any remaining references.
 let allCategories = quickPickCategories
 
+/// Rows whose category equals this are treated as deleted and hidden everywhere.
+/// Lets "delete" work via the (already-deployed) category-update action — no redeploy needed.
+let deletedCategory = "__deleted__"
+
 /// Format a rupee amount with no decimals, e.g. ₹4,239.
 func inr(_ value: Double) -> String {
     let f = NumberFormatter()
