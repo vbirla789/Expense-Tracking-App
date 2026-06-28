@@ -27,10 +27,10 @@ final class Store: ObservableObject {
         isLoading = false
     }
 
-    func add(amount: Double, merchant: String, category: String) async {
+    func add(amount: Double, merchant: String, category: String, note: String = "") async {
         do {
             try await ExpenseAPI.add(amount: amount, merchant: merchant,
-                                     category: category, source: "manual", raw: "")
+                                     category: category, source: "manual", raw: note)
             await load()
         } catch {
             errorMessage = error.localizedDescription
@@ -48,13 +48,13 @@ final class Store: ObservableObject {
         }
     }
 
-    func edit(_ tx: Transaction, amount: Double, category: String) async {
+    func edit(_ tx: Transaction, amount: Double, category: String, note: String) async {
         do {
             // Add a corrected row (preserving the original date), then hide the old one.
             // Works with the deployed backend without needing an amount-update action.
             try await ExpenseAPI.add(amount: amount, merchant: tx.merchant,
                                      category: category, source: tx.source,
-                                     raw: tx.raw, timestamp: tx.timestamp)
+                                     raw: note, timestamp: tx.timestamp)
             try await ExpenseAPI.delete(id: tx.id)
             await load()
         } catch {

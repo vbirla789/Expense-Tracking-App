@@ -263,8 +263,17 @@ struct TransactionRow: View {
             iconBubble(style)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(tx.category)
-                    .font(.subheadline.weight(.medium))
+                HStack(spacing: 6) {
+                    Text(tx.category)
+                        .font(.subheadline.weight(.medium))
+                    if tx.isSplit {
+                        Text("Split")
+                            .font(.caption2.weight(.medium))
+                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(Color.accentColor.opacity(0.15), in: Capsule())
+                            .foregroundStyle(Color.accentColor)
+                    }
+                }
                 Text(tx.date.formatted(date: .abbreviated, time: .omitted))
                     .font(.caption)
                     .foregroundStyle(.secondary)

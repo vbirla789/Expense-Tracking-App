@@ -13,8 +13,19 @@ struct CaptureSheet: View {
     @State private var custom = ""
     @State private var saving = false
     @State private var formHeight: CGFloat = 460
+    @State private var isSplit = false
+    @State private var splitPeople: [String] = []
+    @State private var showContacts = false
 
     private var amountValue: Double? { Double(amount) }
+
+    private var isSplitting: Bool { isSplit && !splitPeople.isEmpty }
+
+    /// Your share = bill ÷ (the people you picked + you).
+    private var shareAmount: Double? {
+        guard let amt = amountValue else { return nil }
+        return isSplitting ? amt / Double(splitPeople.count + 1) : amt
+    }
 
     private var chosenCategory: String {
         let c = custom.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -35,6 +46,7 @@ struct CaptureSheet: View {
                         amountField
                         pillGrid
                         customField
+                        splitSection
                     }
                     .padding()
                     .background(
@@ -56,6 +68,13 @@ struct CaptureSheet: View {
         .presentationDragIndicator(.visible)
         .presentationBackground(.ultraThinMaterial)
         .onAppear(perform: prefill)
+        .sheet(isPresented: $showContacts) {
+            ContactPicker { names in
+                if !names.isEmpty { splitPeople = names }
+                showContacts = false
+            }
+            .ignoresSafeArea()
+        }
     }
 
     private func prefill() {
@@ -75,7 +94,7 @@ struct CaptureSheet: View {
 
     private var amountField: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Amount")
+            Text(isSplitting ? "Total bill" : "Amount")
                 .font(.caption).foregroundStyle(.secondary)
             HStack(spacing: 6) {
                 Text("₹").font(.largeTitle).foregroundStyle(.secondary)
@@ -139,6 +158,61 @@ struct CaptureSheet: View {
         }
     }
 
+    private var splitSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle(isOn: $isSplit.animation()) {
+                HStack(spacing: 10) {
+                    Image(systemName: "person.2.fill")
+                        .foregroundStyle(Color.accentColor)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Split with group").font(.subheadline.weight(.medium))
+                        Text("Counts only your share").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .tint(Color.accentColor)
+
+            if isSplit {
+                Button { showContacts = true } label: {
+                    HStack {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                        Text(splitPeople.isEmpty ? "Add people" : "Split between you + \(splitPeople.count)")
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
+                    }
+                    .font(.subheadline)
+                    .padding(12)
+                    .background(Color(.secondarySystemGroupedBackground),
+                                in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+
+                if !splitPeople.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(splitPeople, id: \.self) { name in
+                                Text(name)
+                                    .font(.caption)
+                                    .padding(.horizontal, 10).padding(.vertical, 5)
+                                    .background(Color.accentColor.opacity(0.15), in: Capsule())
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
+                    }
+                    if let share = shareAmount {
+                        HStack {
+                            Text("Your share").foregroundStyle(.secondary)
+                            Spacer()
+                            Text(inr(share)).fontWeight(.semibold)
+                        }
+                        .font(.subheadline)
+                        .padding(.top, 2)
+                    }
+                }
+            }
+        }
+    }
+
     private var saveBar: some View {
         Button(action: save) {
             Text(saving ? "Saving…" : (isEditing ? "Save changes" : "Save expense"))
@@ -178,13 +252,14 @@ struct CaptureSheet: View {
     }
 
     private func save() {
-        guard let amt = amountValue else { return }
+        guard let finalAmount = shareAmount else { return }
+        let note = isSplitting ? "split|" + splitPeople.joined(separator: ", ") : (editing?.raw ?? "")
         saving = true
         Task {
             if let tx = editing {
-                await store.edit(tx, amount: amt, category: chosenCategory)
+                await store.edit(tx, amount: finalAmount, category: chosenCategory, note: note)
             } else {
-                await store.add(amount: amt, merchant: "", category: chosenCategory)
+                await store.add(amount: finalAmount, merchant: "", category: chosenCategory, note: note)
             }
             dismiss()
         }

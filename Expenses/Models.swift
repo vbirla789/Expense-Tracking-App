@@ -12,6 +12,10 @@ struct Transaction: Identifiable, Codable, Hashable {
 
     var date: Date { Transaction.parseDate(timestamp) }
 
+    /// Split metadata is stored in `raw` as "split|Name, Name".
+    var isSplit: Bool { raw.hasPrefix("split|") }
+    var splitWith: String { isSplit ? String(raw.dropFirst("split|".count)) : "" }
+
     /// Apps Script sends ISO8601, sometimes with fractional seconds — handle both.
     static func parseDate(_ s: String) -> Date {
         let withFrac = ISO8601DateFormatter()
