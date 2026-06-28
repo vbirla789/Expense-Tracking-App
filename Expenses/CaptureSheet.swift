@@ -27,51 +27,59 @@ struct CaptureSheet: View {
         return isSplitting ? amt / Double(splitPeople.count + 1) : amt
     }
 
+    /// The "Or type your own" field only appears when Others is selected.
+    private var showCustom: Bool { selected == "Others" }
+
     private var chosenCategory: String {
-        let c = custom.trimmingCharacters(in: .whitespacesAndNewlines)
-        return c.isEmpty ? selected : c
+        if selected == "Others" {
+            let c = custom.trimmingCharacters(in: .whitespacesAndNewlines)
+            return c.isEmpty ? "Others" : c
+        }
+        return selected
     }
 
     private var canSave: Bool {
-        (amountValue ?? 0) > 0 && !chosenCategory.isEmpty && !saving
+        (amountValue ?? 0) > 0 && !selected.isEmpty && !saving
     }
 
     private var isEditing: Bool { editing != nil }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                ScrollView {
-                    VStack(spacing: 24) {
-                        amountField
-                        pillGrid
-                        customField
-                        splitSection
-                    }
-                    .padding()
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear.preference(key: SheetHeightKey.self, value: geo.size.height)
-                        }
-                    )
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 22) {
+                    amountField
+                    pillGrid
+                    if showCustom { customField }
+                    splitSection
                 }
-                .scrollContentBackground(.hidden)
-                .scrollBounceBehavior(.basedOnSize)
-
-                saveBar
+                .padding(.horizontal, 16)
+                .padding(.top, 26)
+                .padding(.bottom, 8)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(key: SheetHeightKey.self, value: geo.size.height)
+                    }
+                )
             }
-            .navigationTitle(isEditing ? "Edit expense" : "New expense")
-            .navigationBarTitleDisplayMode(.inline)
-            .onPreferenceChange(SheetHeightKey.self) { formHeight = $0 }
+            .scrollContentBackground(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+
+            saveBar
         }
-        .presentationDetents([.height(formHeight + 148)])
+        .presentationDetents([.height(formHeight + 110)])
         .presentationDragIndicator(.visible)
         .presentationBackground(.ultraThinMaterial)
         .onAppear(perform: prefill)
+        .onChange(of: isSplit) { _, on in
+            if on && splitPeople.isEmpty { showContacts = true }
+        }
+        .onPreferenceChange(SheetHeightKey.self) { formHeight = $0 }
         .sheet(isPresented: $showContacts) {
             ContactPicker { names in
                 if !names.isEmpty { splitPeople = names }
                 showContacts = false
+                if splitPeople.isEmpty { isSplit = false }
             }
             .ignoresSafeArea()
         }
@@ -83,6 +91,7 @@ struct CaptureSheet: View {
             if quickPickCategories.contains(tx.category) {
                 selected = tx.category
             } else {
+                selected = "Others"
                 custom = tx.category
             }
         } else if let a = initialAmount, a > 0 {
@@ -103,7 +112,8 @@ struct CaptureSheet: View {
                     .keyboardType(.decimalPad)
             }
             .padding()
-            .glassCard(cornerRadius: 18)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 
@@ -123,9 +133,10 @@ struct CaptureSheet: View {
 
     private func pill(_ cat: String) -> some View {
         let style = CategoryStyle.of(cat)
-        let isOn = selected == cat && custom.isEmpty
+        let isOn = selected == cat
         return Button {
-            withAnimation(.snappy) { selected = cat; custom = "" }
+            selected = cat
+            if cat != "Others" { custom = "" }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: style.icon).font(.subheadline)
@@ -145,16 +156,14 @@ struct CaptureSheet: View {
 
     private var customField: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Or type your own")
+            Text("Name this category")
                 .font(.caption).foregroundStyle(.secondary)
             TextField("e.g. Doctor, Gift…", text: $custom)
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
                 .padding()
-                .glassCard(cornerRadius: 14)
-                .onChange(of: custom) { _, value in
-                    if !value.isEmpty { selected = "" }
-                }
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 
@@ -172,13 +181,13 @@ struct CaptureSheet: View {
             }
             .tint(Color.accentColor)
 
-            if isSplit {
+            if isSplit && !splitPeople.isEmpty {
                 Button { showContacts = true } label: {
                     HStack {
                         Image(systemName: "person.crop.circle.badge.plus")
-                        Text(splitPeople.isEmpty ? "Add people" : "Split between you + \(splitPeople.count)")
+                        Text("Split between you + \(splitPeople.count)")
                         Spacer()
-                        Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
+                        Image(systemName: "pencil").font(.caption2).foregroundStyle(.secondary)
                     }
                     .font(.subheadline)
                     .padding(12)
@@ -187,27 +196,26 @@ struct CaptureSheet: View {
                 }
                 .buttonStyle(.plain)
 
-                if !splitPeople.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(splitPeople, id: \.self) { name in
-                                Text(name)
-                                    .font(.caption)
-                                    .padding(.horizontal, 10).padding(.vertical, 5)
-                                    .background(Color.accentColor.opacity(0.15), in: Capsule())
-                                    .foregroundStyle(Color.accentColor)
-                            }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(splitPeople, id: \.self) { name in
+                            Text(name)
+                                .font(.caption)
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .background(Color.accentColor.opacity(0.15), in: Capsule())
+                                .foregroundStyle(Color.accentColor)
                         }
                     }
-                    if let share = shareAmount {
-                        HStack {
-                            Text("Your share").foregroundStyle(.secondary)
-                            Spacer()
-                            Text(inr(share)).fontWeight(.semibold)
-                        }
-                        .font(.subheadline)
-                        .padding(.top, 2)
+                }
+
+                if let share = shareAmount {
+                    HStack {
+                        Text("Your share").foregroundStyle(.secondary)
+                        Spacer()
+                        Text(inr(share)).fontWeight(.semibold)
                     }
+                    .font(.subheadline)
+                    .padding(.top, 2)
                 }
             }
         }
@@ -219,9 +227,9 @@ struct CaptureSheet: View {
                 .font(.headline)
                 .foregroundStyle(canSave ? Color.white : Color.secondary)
                 .frame(maxWidth: .infinity)
-                .frame(height: 52)                       // CTA height: 52pt
+                .frame(height: 52)
                 .background(
-                    canSave ? Color.accentColor : Color(.systemGray5),   // solid grey when disabled
+                    canSave ? Color.accentColor : Color(.systemGray5),
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
         }
@@ -229,12 +237,10 @@ struct CaptureSheet: View {
         .disabled(!canSave)
         .padding(.horizontal, 16)
         .padding(.top, 12)
-        .padding(.bottom, 24)                            // 24pt from the bottom
+        .padding(.bottom, 24)
         .background(progressiveBlur)
     }
 
-    /// Variable "progressive" blur — frosted at the bottom, fading to clear
-    /// upward, like the bottom bars in Apple Music / Maps.
     private var progressiveBlur: some View {
         Rectangle()
             .fill(.ultraThinMaterial)
