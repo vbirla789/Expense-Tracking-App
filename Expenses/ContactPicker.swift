@@ -1,6 +1,6 @@
 import SwiftUI
 import Combine
-@preconcurrency import Contacts
+import Contacts
 
 struct ContactItem: Identifiable, Hashable {
     let id: String
@@ -13,26 +13,53 @@ final class ContactsLoader: ObservableObject {
     @Published var denied = false
     @Published var loading = true
 
-    func load() {
-        let store = CNContactStore()
-        store.requestAccess(for: .contacts) { granted, _ in
-            if !granted {
-                Task { @MainActor in self.denied = true; self.loading = false }
-                return
+    func load() async {
+        loading = true
+        denied = false
+        let granted = await Self.requestAccess()
+        if !granted {
+            denied = true
+            loading = false
+            return
+        }
+        contacts = await Self.fetchContacts()
+        loading = false
+    }
+
+    private static func requestAccess() async -> Bool {
+        await withCheckedContinuation { continuation in
+            CNContactStore().requestAccess(for: .contacts) { granted, _ in
+                continuation.resume(returning: granted)
             }
-            let keys = [CNContactGivenNameKey, CNContactFamilyNameKey] as [CNKeyDescriptor]
-            let req = CNContactFetchRequest(keysToFetch: keys)
-            var items: [ContactItem] = []
-            try? store.enumerateContacts(with: req) { c, _ in
-                let formatted = CNContactFormatter.string(from: c, style: .fullName) ?? ""
-                let name = formatted.isEmpty
-                    ? [c.givenName, c.familyName].filter { !$0.isEmpty }.joined(separator: " ")
-                    : formatted
-                let trimmed = name.trimmingCharacters(in: .whitespaces)
-                if !trimmed.isEmpty { items.append(ContactItem(id: c.identifier, name: trimmed)) }
+        }
+    }
+
+    private static func fetchContacts() async -> [ContactItem] {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let store = CNContactStore()
+                let keys = [CNContactGivenNameKey, CNContactFamilyNameKey] as [CNKeyDescriptor]
+                let request = CNContactFetchRequest(keysToFetch: keys)
+                var result: [ContactItem] = []
+                do {
+                    try store.enumerateContacts(with: request) { contact, _ in
+                        let formatted = CNContactFormatter.string(from: contact, style: .fullName) ?? ""
+                        let name = formatted.isEmpty
+                            ? [contact.givenName, contact.familyName].filter { !$0.isEmpty }.joined(separator: " ")
+                            : formatted
+                        let trimmed = name.trimmingCharacters(in: .whitespaces)
+                        if !trimmed.isEmpty {
+                            result.append(ContactItem(id: contact.identifier, name: trimmed))
+                        }
+                    }
+                } catch {
+                    // return whatever was collected
+                }
+                let sorted = result.sorted {
+                    $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                }
+                continuation.resume(returning: sorted)
             }
-            items.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-            Task { @MainActor in self.contacts = items; self.loading = false }
         }
     }
 }
@@ -63,6 +90,7 @@ struct ContactPickerView: View {
                         description: Text("Allow Contacts for Expenses in Settings to pick people."))
                 } else if loader.loading {
                     ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List(filtered) { item in
                         Button {
@@ -88,7 +116,11 @@ struct ContactPickerView: View {
                     Button("Done") { onDone(Array(selected)); dismiss() }
                 }
             }
-            .onAppear { if loader.contacts.isEmpty && !loader.denied { loader.load() } }
+            .task {
+                if loader.contacts.isEmpty && !loader.denied {
+                    await loader.load()
+                }
+            }
         }
     }
 }
