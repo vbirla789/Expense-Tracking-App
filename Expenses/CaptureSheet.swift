@@ -50,11 +50,6 @@ struct CaptureSheet: View {
             }
             .navigationTitle(isEditing ? "Edit expense" : "New expense")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
             .onPreferenceChange(SheetHeightKey.self) { formHeight = $0 }
         }
         .presentationDetents([.height(formHeight + 148)])
