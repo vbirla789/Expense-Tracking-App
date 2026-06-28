@@ -127,6 +127,8 @@ struct DashboardView: View {
                                     category: selectedCategory)
             }
             .padding(16)
+            .animation(.snappy, value: monthOnly)
+            .animation(.snappy, value: selectedCategory)
         }
         .background(Color(.systemGroupedBackground))
     }
@@ -150,6 +152,7 @@ struct HeroSummary: View {
             Text(inr(total))
                 .font(.system(size: 42, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
+                .contentTransition(.numericText())
 
             Label("\(count) transactions", systemImage: "list.bullet")
                 .font(.caption.weight(.medium))
@@ -309,6 +312,16 @@ extension View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 20))
+    }
+
+    /// Frosted-glass panel with a subtle edge highlight (glassmorphism).
+    func glassCard(cornerRadius: CGFloat) -> some View {
+        self
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .strokeBorder(.white.opacity(0.22), lineWidth: 1)
+            )
     }
 }
 

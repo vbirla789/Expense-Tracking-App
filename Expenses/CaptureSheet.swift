@@ -44,10 +44,11 @@ struct CaptureSheet: View {
                 }
             }
             .safeAreaInset(edge: .bottom) { saveBar }
-            .background(Color(.systemGroupedBackground))
+            .scrollContentBackground(.hidden)
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .presentationBackground(.ultraThinMaterial)
         .onAppear(perform: prefill)
     }
 
@@ -77,8 +78,7 @@ struct CaptureSheet: View {
                     .keyboardType(.decimalPad)
             }
             .padding()
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .glassCard(cornerRadius: 18)
         }
     }
 
@@ -100,8 +100,7 @@ struct CaptureSheet: View {
         let style = CategoryStyle.of(cat)
         let isOn = selected == cat && custom.isEmpty
         return Button {
-            selected = cat
-            custom = ""
+            withAnimation(.snappy) { selected = cat; custom = "" }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: style.icon).font(.subheadline)
@@ -127,8 +126,7 @@ struct CaptureSheet: View {
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
                 .padding()
-                .background(Color(.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .glassCard(cornerRadius: 14)
                 .onChange(of: custom) { _, value in
                     if !value.isEmpty { selected = "" }
                 }
@@ -154,9 +152,11 @@ struct CaptureSheet: View {
                 .padding(.vertical, 6)
         }
         .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .tint(Color.accentColor)
         .disabled(!canSave)
         .padding()
-        .background(.bar)
+        .background(.ultraThinMaterial)
     }
 
     private func trimmed(_ d: Double) -> String {
