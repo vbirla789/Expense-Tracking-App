@@ -12,6 +12,7 @@ struct CaptureSheet: View {
     @State private var selected = ""
     @State private var custom = ""
     @State private var saving = false
+    @State private var formHeight: CGFloat = 460
 
     private var amountValue: Double? { Double(amount) }
 
@@ -36,8 +37,14 @@ struct CaptureSheet: View {
                         customField
                     }
                     .padding()
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear.preference(key: SheetHeightKey.self, value: geo.size.height)
+                        }
+                    )
                 }
                 .scrollContentBackground(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
 
                 saveBar
             }
@@ -48,8 +55,9 @@ struct CaptureSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .onPreferenceChange(SheetHeightKey.self) { formHeight = $0 }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.height(formHeight + 148)])
         .presentationDragIndicator(.visible)
         .presentationBackground(.ultraThinMaterial)
         .onAppear(perform: prefill)
@@ -152,7 +160,7 @@ struct CaptureSheet: View {
         .disabled(!canSave)
         .padding(.horizontal, 16)
         .padding(.top, 12)
-        .padding(.bottom, 32)                            // 32pt from the bottom
+        .padding(.bottom, 24)                            // 24pt from the bottom
         .background(progressiveBlur)
     }
 
@@ -189,6 +197,14 @@ struct CaptureSheet: View {
 
     private func trimmed(_ d: Double) -> String {
         d == d.rounded() ? String(Int(d)) : String(d)
+    }
+}
+
+/// Reports the natural height of the form content so the sheet can size to fit.
+private struct SheetHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 460
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
