@@ -45,11 +45,13 @@ let allCategories = quickPickCategories
 /// Lets "delete" work via the (already-deployed) category-update action — no redeploy needed.
 let deletedCategory = "__deleted__"
 
-/// Format a rupee amount with no decimals, e.g. ₹4,239.
+/// Format a rupee amount with no decimals, Indian grouping, e.g. ₹1,00,000.
 func inr(_ value: Double) -> String {
     let f = NumberFormatter()
     f.numberStyle = .currency
     f.currencyCode = "INR"
+    f.currencySymbol = "₹"
+    f.locale = Locale(identifier: "en_IN")
     f.maximumFractionDigits = 0
     return f.string(from: NSNumber(value: value)) ?? "₹\(Int(value))"
 }

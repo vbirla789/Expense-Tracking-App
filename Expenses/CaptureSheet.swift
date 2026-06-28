@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Bottom sheet for adding a new expense (amount pre-filled from a transaction)
-/// or editing an existing one.
+/// or editing an existing one. Sizes itself to its content.
 struct CaptureSheet: View {
     @ObservedObject var store: Store
     var initialAmount: Double?
@@ -12,13 +12,12 @@ struct CaptureSheet: View {
     @State private var selected = ""
     @State private var custom = ""
     @State private var saving = false
-    @State private var formHeight: CGFloat = 460
+    @State private var sheetHeight: CGFloat = 480
     @State private var isSplit = false
     @State private var splitPeople: [String] = []
     @State private var showContacts = false
 
     private var amountValue: Double? { Double(amount) }
-
     private var isSplitting: Bool { isSplit && !splitPeople.isEmpty }
 
     /// Your share = bill ÷ (the people you picked + you).
@@ -27,7 +26,6 @@ struct CaptureSheet: View {
         return isSplitting ? amt / Double(splitPeople.count + 1) : amt
     }
 
-    /// The "Or type your own" field only appears when Others is selected.
     private var showCustom: Bool { selected == "Others" }
 
     private var chosenCategory: String {
@@ -45,43 +43,38 @@ struct CaptureSheet: View {
     private var isEditing: Bool { editing != nil }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 22) {
-                    amountField
-                    pillGrid
-                    if showCustom { customField }
-                    splitSection
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 26)
-                .padding(.bottom, 8)
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(key: SheetHeightKey.self, value: geo.size.height)
-                    }
-                )
+        VStack(spacing: 20) {
+            amountField
+            pillGrid
+            if showCustom {
+                customField
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
-            .scrollContentBackground(.hidden)
-            .scrollBounceBehavior(.basedOnSize)
-
-            saveBar
+            splitSection
+            saveButton
         }
-        .presentationDetents([.height(formHeight + 110)])
+        .padding(.horizontal, 16)
+        .padding(.top, 28)
+        .padding(.bottom, 28)
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { sheetHeight = geo.size.height }
+                    .onChange(of: geo.size.height) { _, h in sheetHeight = h }
+            }
+        )
+        .background(
+            ContactPickerPresenter(isPresented: $showContacts) { names in
+                if !names.isEmpty { splitPeople = names }
+                if splitPeople.isEmpty { isSplit = false }
+            }
+        )
+        .presentationDetents([.height(sheetHeight)])
         .presentationDragIndicator(.visible)
         .presentationBackground(.ultraThinMaterial)
         .onAppear(perform: prefill)
         .onChange(of: isSplit) { _, on in
             if on && splitPeople.isEmpty { showContacts = true }
-        }
-        .onPreferenceChange(SheetHeightKey.self) { formHeight = $0 }
-        .sheet(isPresented: $showContacts) {
-            ContactPicker { names in
-                if !names.isEmpty { splitPeople = names }
-                showContacts = false
-                if splitPeople.isEmpty { isSplit = false }
-            }
-            .ignoresSafeArea()
         }
     }
 
@@ -105,10 +98,12 @@ struct CaptureSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(isSplitting ? "Total bill" : "Amount")
                 .font(.caption).foregroundStyle(.secondary)
-            HStack(spacing: 6) {
-                Text("₹").font(.largeTitle).foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("₹")
+                    .font(.system(size: 30, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
                 TextField("0", text: $amount)
-                    .font(.system(size: 44, weight: .bold, design: .rounded))
+                    .font(.system(size: 40, weight: .bold, design: .rounded))
                     .keyboardType(.decimalPad)
             }
             .padding()
@@ -135,8 +130,10 @@ struct CaptureSheet: View {
         let style = CategoryStyle.of(cat)
         let isOn = selected == cat
         return Button {
-            selected = cat
-            if cat != "Others" { custom = "" }
+            withAnimation(.snappy(duration: 0.28)) {
+                selected = cat
+                if cat != "Others" { custom = "" }
+            }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: style.icon).font(.subheadline)
@@ -169,7 +166,7 @@ struct CaptureSheet: View {
 
     private var splitSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Toggle(isOn: $isSplit.animation()) {
+            Toggle(isOn: $isSplit.animation(.snappy(duration: 0.28))) {
                 HStack(spacing: 10) {
                     Image(systemName: "person.2.fill")
                         .foregroundStyle(Color.accentColor)
@@ -221,7 +218,7 @@ struct CaptureSheet: View {
         }
     }
 
-    private var saveBar: some View {
+    private var saveButton: some View {
         Button(action: save) {
             Text(saving ? "Saving…" : (isEditing ? "Save changes" : "Save expense"))
                 .font(.headline)
@@ -235,26 +232,7 @@ struct CaptureSheet: View {
         }
         .buttonStyle(.plain)
         .disabled(!canSave)
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 24)
-        .background(progressiveBlur)
-    }
-
-    private var progressiveBlur: some View {
-        Rectangle()
-            .fill(.ultraThinMaterial)
-            .mask(
-                LinearGradient(
-                    stops: [
-                        .init(color: .clear, location: 0.0),
-                        .init(color: .black.opacity(0.6), location: 0.3),
-                        .init(color: .black, location: 0.7)
-                    ],
-                    startPoint: .top, endPoint: .bottom
-                )
-            )
-            .ignoresSafeArea()
+        .padding(.top, 4)
     }
 
     private func save() {
@@ -273,14 +251,6 @@ struct CaptureSheet: View {
 
     private func trimmed(_ d: Double) -> String {
         d == d.rounded() ? String(Int(d)) : String(d)
-    }
-}
-
-/// Reports the natural height of the form content so the sheet can size to fit.
-private struct SheetHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 460
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
 

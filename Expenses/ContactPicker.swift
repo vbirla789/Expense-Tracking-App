@@ -1,40 +1,53 @@
 import SwiftUI
 import ContactsUI
 
-/// Native multi-select contact picker. Uses the system picker, which runs
-/// out-of-process — so it needs NO contacts-permission prompt; the app only
-/// ever receives the people you explicitly tick.
-struct ContactPicker: UIViewControllerRepresentable {
+/// Presents Apple's native multi-select contact picker *imperatively* from a
+/// hidden host controller. Presenting it this way (instead of a SwiftUI .sheet)
+/// means dismissing the picker never dismisses the capture sheet behind it.
+/// No contacts permission needed — the system picker returns only who you tick.
+struct ContactPickerPresenter: UIViewControllerRepresentable {
+    @Binding var isPresented: Bool
     var onSelect: ([String]) -> Void
 
-    func makeUIViewController(context: Context) -> CNContactPickerViewController {
-        let picker = CNContactPickerViewController()
-        picker.delegate = context.coordinator
-        return picker
+    func makeUIViewController(context: Context) -> UIViewController { UIViewController() }
+
+    func updateUIViewController(_ host: UIViewController, context: Context) {
+        context.coordinator.parent = self
+        if isPresented, host.presentedViewController == nil, !context.coordinator.presenting {
+            context.coordinator.presenting = true
+            let picker = CNContactPickerViewController()
+            picker.delegate = context.coordinator
+            host.present(picker, animated: true)
+        }
     }
 
-    func updateUIViewController(_ controller: CNContactPickerViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator { Coordinator(onSelect: onSelect) }
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     final class Coordinator: NSObject, CNContactPickerDelegate {
-        let onSelect: ([String]) -> Void
-        init(onSelect: @escaping ([String]) -> Void) { self.onSelect = onSelect }
+        var parent: ContactPickerPresenter
+        var presenting = false
+        init(_ parent: ContactPickerPresenter) { self.parent = parent }
 
-        // Implementing ONLY the plural delegate makes the picker multi-select
-        // (checkmarks + a Done button).
         func contactPicker(_ picker: CNContactPickerViewController, didSelect contacts: [CNContact]) {
-            let names = contacts.map { c -> String in
-                let full = CNContactFormatter.string(from: c, style: .fullName) ?? ""
-                if !full.isEmpty { return full }
-                let parts = [c.givenName, c.familyName].filter { !$0.isEmpty }
-                return parts.isEmpty ? "Someone" : parts.joined(separator: " ")
-            }
-            onSelect(names)
+            parent.onSelect(contacts.map(name))
+            finish()
         }
 
         func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
-            onSelect([])
+            parent.onSelect([])
+            finish()
+        }
+
+        private func finish() {
+            presenting = false
+            parent.isPresented = false
+        }
+
+        private func name(_ c: CNContact) -> String {
+            let full = CNContactFormatter.string(from: c, style: .fullName) ?? ""
+            if !full.isEmpty { return full }
+            let parts = [c.givenName, c.familyName].filter { !$0.isEmpty }
+            return parts.isEmpty ? "Someone" : parts.joined(separator: " ")
         }
     }
 }
