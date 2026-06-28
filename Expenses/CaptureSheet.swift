@@ -12,7 +12,7 @@ struct CaptureSheet: View {
     @State private var selected = ""
     @State private var custom = ""
     @State private var saving = false
-    @State private var sheetHeight: CGFloat = 480
+    @State private var formHeight: CGFloat = 360
     @State private var isSplit = false
     @State private var splitPeople: [String] = []
     @State private var showContacts = false
@@ -43,33 +43,43 @@ struct CaptureSheet: View {
     private var isEditing: Bool { editing != nil }
 
     var body: some View {
-        VStack(spacing: 20) {
-            amountField
-            pillGrid
-            if showCustom {
-                customField
-                    .transition(.move(edge: .top).combined(with: .opacity))
+        ScrollView {
+            VStack(spacing: 20) {
+                amountField
+                pillGrid
+                if showCustom {
+                    customField
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                splitSection
             }
-            splitSection
-            saveButton
+            .padding(.horizontal, 16)
+            .padding(.top, 24)
+            .padding(.bottom, 8)
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear { formHeight = geo.size.height }
+                        .onChange(of: geo.size.height) { _, h in formHeight = h }
+                }
+            )
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 28)
-        .padding(.bottom, 28)
-        .background(
-            GeometryReader { geo in
-                Color.clear
-                    .onAppear { sheetHeight = geo.size.height }
-                    .onChange(of: geo.size.height) { _, h in sheetHeight = h }
-            }
-        )
+        .scrollContentBackground(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
         .background(
             ContactPickerPresenter(isPresented: $showContacts) { names in
                 if !names.isEmpty { splitPeople = names }
                 if splitPeople.isEmpty { isSplit = false }
             }
         )
-        .presentationDetents([.height(sheetHeight)])
+        .safeAreaInset(edge: .bottom) {
+            saveButton
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+                .background(Color(.systemGroupedBackground))
+        }
+        .presentationDetents([.height(formHeight + 84)])
         .presentationDragIndicator(.visible)
         .presentationBackground(Color(.systemGroupedBackground))
         .onAppear(perform: prefill)
@@ -227,7 +237,6 @@ struct CaptureSheet: View {
         }
         .buttonStyle(.plain)
         .disabled(!canSave)
-        .padding(.top, 4)
     }
 
     private func save() {
