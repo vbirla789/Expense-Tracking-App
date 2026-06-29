@@ -114,10 +114,15 @@ final class Store: ObservableObject {
     }
 
     /// Transactions for the current scope, optionally filtered to one category
-    /// (category == nil means "All"). Used by the inline filter pills.
+    /// (category == nil means "All"). "Others" is a catch-all for any category
+    /// that isn't one of the main pills (so custom categories land there too).
     func filtered(monthOnly: Bool, category: String?) -> [Transaction] {
-        transactions.filter { tx in
-            (!monthOnly || isThisMonth(tx.date)) && (category == nil || tx.category == category)
+        let mains: Set<String> = ["Cab", "Sutta", "Groceries", "Outing", "Rent", "Income"]
+        return transactions.filter { tx in
+            guard !monthOnly || isThisMonth(tx.date) else { return false }
+            guard let category else { return true }            // All
+            if category == "Others" { return !mains.contains(tx.category) }
+            return tx.category == category
         }
     }
 }
