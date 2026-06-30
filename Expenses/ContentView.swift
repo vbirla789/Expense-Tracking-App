@@ -102,6 +102,14 @@ struct DashboardView: View {
         visibleTransactions.reduce(0) { $0 + ($1.category == "Income" ? 0 : $1.effectiveAmount) }
     }
 
+    private var heroTitle: String {
+        let month = Date().formatted(.dateTime.month(.wide))
+        if let cat = selectedCategory {
+            return monthOnly ? "\(cat) · \(month)" : "\(cat) · all time"
+        }
+        return monthOnly ? "Spent in \(month)" : "Spent all time"
+    }
+
     var body: some View {
         List {
             Section {
@@ -113,9 +121,7 @@ struct DashboardView: View {
                         .listRowSeparator(.hidden)
                 }
 
-                HeroSummary(total: store.total(monthOnly: monthOnly),
-                            monthOnly: monthOnly,
-                            count: store.filtered(monthOnly: monthOnly, category: nil).count)
+                HeroSummary(title: heroTitle, total: filteredTotal, count: visibleTransactions.count)
                     .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 6, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -157,14 +163,6 @@ struct DashboardView: View {
                             }
                     }
                 }
-            } header: {
-                HStack {
-                    Text(selectedCategory ?? "All transactions")
-                    Spacer()
-                    if selectedCategory != nil {
-                        Text(inr(filteredTotal))
-                    }
-                }
             }
         }
         .listStyle(.insetGrouped)
@@ -176,17 +174,13 @@ struct DashboardView: View {
 }
 
 struct HeroSummary: View {
+    let title: String
     let total: Double
-    let monthOnly: Bool
     let count: Int
-
-    private var label: String {
-        monthOnly ? "Spent in \(Date().formatted(.dateTime.month(.wide)))" : "Spent all time"
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label)
+            Text(title)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.white.opacity(0.85))
 
