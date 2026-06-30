@@ -108,7 +108,7 @@ struct DashboardView: View {
                 if let error = store.errorMessage {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .font(.footnote).foregroundStyle(.red)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
@@ -116,7 +116,7 @@ struct DashboardView: View {
                 HeroSummary(total: store.total(monthOnly: monthOnly),
                             monthOnly: monthOnly,
                             count: store.filtered(monthOnly: monthOnly, category: nil).count)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 6, trailing: 16))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 6, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
 
@@ -125,12 +125,12 @@ struct DashboardView: View {
                     Text("All time").tag(false)
                 }
                 .pickerStyle(.segmented)
-                .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
                 CategoryFilterBar(categories: quickPickCategories, selected: $selectedCategory)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 8, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             }
