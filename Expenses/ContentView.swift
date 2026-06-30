@@ -135,9 +135,22 @@ struct DashboardView: View {
             }
 
             Section {
+                HStack {
+                    Text(selectedCategory ?? "All transactions")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if selectedCategory != nil {
+                        Text(inr(filteredTotal))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                    }
+                }
+                .padding(.vertical, 8)
+                .listRowSeparator(.hidden)
+
                 if visibleTransactions.isEmpty {
                     EmptyTransactions(category: selectedCategory, monthOnly: monthOnly)
-                        .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 } else {
                     ForEach(Array(visibleTransactions.prefix(100))) { tx in
@@ -155,14 +168,6 @@ struct DashboardView: View {
                                 }
                                 .tint(.blue)
                             }
-                    }
-                }
-            } header: {
-                HStack {
-                    Text(selectedCategory ?? "All transactions")
-                    if selectedCategory != nil {
-                        Spacer()
-                        Text(inr(filteredTotal)).textCase(nil)
                     }
                 }
             }
