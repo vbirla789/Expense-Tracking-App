@@ -19,12 +19,7 @@ struct ContentView: View {
                             .buttonStyle(.borderedProminent)
                     }
                 } else if !store.hasLoaded {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                        Text("Loading your expenses…")
-                            .font(.subheadline).foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    LoadingSkeleton()
                 } else {
                     DashboardView(store: store)
                 }
@@ -141,8 +136,9 @@ struct DashboardView: View {
 
             Section {
                 if visibleTransactions.isEmpty {
-                    Text(store.isLoading ? "Loading…" : "No transactions here yet.")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                    EmptyTransactions(category: selectedCategory, monthOnly: monthOnly)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 } else {
                     ForEach(Array(visibleTransactions.prefix(100))) { tx in
                         TransactionRow(tx: tx)
@@ -274,7 +270,7 @@ struct TransactionRow: View {
                             .foregroundStyle(Color.accentColor)
                     }
                 }
-                Text(tx.date.formatted(date: .abbreviated, time: .omitted))
+                Text(relativeDay(tx.date))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -290,7 +286,110 @@ struct TransactionRow: View {
     }
 }
 
+// MARK: - Empty state
+
+struct EmptyTransactions: View {
+    let category: String?
+    let monthOnly: Bool
+
+    private var icon: String {
+        category.map { CategoryStyle.of($0).icon } ?? "tray"
+    }
+    private var title: String {
+        if let c = category { return "No \(c) yet" }
+        return monthOnly ? "Nothing spent this month" : "No transactions yet"
+    }
+    private var subtitle: String {
+        category != nil
+            ? "Try a different category or time range."
+            : "Tap + to log your first expense."
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 34))
+                .foregroundStyle(.secondary)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+    }
+}
+
+// MARK: - Loading skeleton
+
+struct LoadingSkeleton: View {
+    var body: some View {
+        List {
+            Section {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color(.secondarySystemGroupedBackground))
+                    .frame(height: 128)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
+            Section {
+                ForEach(0..<6, id: \.self) { _ in
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(Color(.tertiarySystemGroupedBackground))
+                            .frame(width: 40, height: 40)
+                        VStack(alignment: .leading, spacing: 6) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(.tertiarySystemGroupedBackground))
+                                .frame(width: 110, height: 11)
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(.tertiarySystemGroupedBackground))
+                                .frame(width: 60, height: 9)
+                        }
+                        Spacer()
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(.tertiarySystemGroupedBackground))
+                            .frame(width: 48, height: 11)
+                    }
+                    .padding(.vertical, 6)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(14)
+        .scrollContentBackground(.hidden)
+        .background(Color(.systemGroupedBackground))
+        .modifier(Pulse())
+    }
+}
+
+/// Gentle opacity pulse for placeholder content while data loads.
+struct Pulse: ViewModifier {
+    @State private var dim = false
+    func body(content: Content) -> some View {
+        content
+            .opacity(dim ? 0.5 : 1)
+            .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: dim)
+            .onAppear { dim = true }
+    }
+}
+
 // MARK: - Shared helpers
+
+/// "Today" / "Yesterday" / weekday (within a week) / abbreviated date.
+func relativeDay(_ date: Date) -> String {
+    let cal = Calendar.current
+    if cal.isDateInToday(date) { return "Today" }
+    if cal.isDateInYesterday(date) { return "Yesterday" }
+    let days = cal.dateComponents([.day],
+                                  from: cal.startOfDay(for: date),
+                                  to: cal.startOfDay(for: Date())).day ?? 0
+    if days > 0 && days < 7 { return date.formatted(.dateTime.weekday(.wide)) }
+    return date.formatted(date: .abbreviated, time: .omitted)
+}
 
 @ViewBuilder
 func iconBubble(_ style: CategoryStyle) -> some View {
