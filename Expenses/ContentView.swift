@@ -62,7 +62,7 @@ struct CategoryStyle {
     static func of(_ name: String) -> CategoryStyle {
         switch name {
         case "Cab":                   return .init(icon: "car.fill", color: .blue)
-        case "Sutta", "Ciggs":        return .init(icon: "smoke.fill", color: .gray)
+        case "Sutta", "Ciggs":        return .init(icon: "smoke.fill", color: .teal)
         case "Groceries":             return .init(icon: "cart.fill", color: .green)
         case "Outing":                return .init(icon: "party.popper.fill", color: .purple)
         case "Rent":                  return .init(icon: "house.fill", color: .brown)
