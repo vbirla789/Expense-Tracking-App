@@ -103,11 +103,7 @@ struct DashboardView: View {
     }
 
     private var heroTitle: String {
-        let month = Date().formatted(.dateTime.month(.wide))
-        if let cat = selectedCategory {
-            return monthOnly ? "\(cat) · \(month)" : "\(cat) · all time"
-        }
-        return monthOnly ? "Spent in \(month)" : "Spent all time"
+        monthOnly ? "Spent in \(Date().formatted(.dateTime.month(.wide)))" : "Spent all time"
     }
 
     var body: some View {
@@ -121,7 +117,9 @@ struct DashboardView: View {
                         .listRowSeparator(.hidden)
                 }
 
-                HeroSummary(title: heroTitle, total: filteredTotal, count: visibleTransactions.count)
+                HeroSummary(title: heroTitle,
+                            total: store.total(monthOnly: monthOnly),
+                            count: store.filtered(monthOnly: monthOnly, category: nil).count)
                     .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 6, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -163,9 +161,18 @@ struct DashboardView: View {
                             }
                     }
                 }
+            } header: {
+                HStack {
+                    Text(selectedCategory ?? "All transactions")
+                    if selectedCategory != nil {
+                        Spacer()
+                        Text(inr(filteredTotal)).textCase(nil)
+                    }
+                }
             }
         }
         .listStyle(.insetGrouped)
+        .listSectionSpacing(14)
         .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground))
         .animation(.snappy, value: monthOnly)
