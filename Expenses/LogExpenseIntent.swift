@@ -71,7 +71,11 @@ struct OpenCaptureIntent: AppIntent {
     static var description = IntentDescription("Opens the app to log a transaction, with the amount filled in.")
     static var openAppWhenRun = true
 
-    @Parameter(title: "Amount")
+    // Default 0 so the intent ALWAYS runs even if the parsed amount is empty.
+    // Without a default, an empty value makes iOS try to *ask* for the amount —
+    // which it can't do inside a background automation, so the intent silently
+    // never runs and the app never opens.
+    @Parameter(title: "Amount", default: 0)
     var amount: Double
 
     static var parameterSummary: some ParameterSummary {
@@ -80,8 +84,8 @@ struct OpenCaptureIntent: AppIntent {
 
     func perform() async throws -> some IntentResult {
         let amt = amount
-        CaptureCoordinator.stash(amt)                       // fallback (cross-process)
-        await MainActor.run { CaptureCoordinator.shared.begin(amount: amt) }  // direct (reliable)
+        CaptureCoordinator.stash(amt)                       // fallback: shows on next app open
+        await MainActor.run { CaptureCoordinator.shared.begin(amount: amt) }  // direct (when foreground)
         return .result()
     }
 }
