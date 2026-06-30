@@ -143,10 +143,10 @@ struct DashboardView: View {
                     if selectedCategory != nil {
                         Text(inr(filteredTotal))
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.vertical, 8)
+                .listRowInsets(EdgeInsets(top: 14, leading: 16, bottom: 0, trailing: 16))
                 .listRowSeparator(.hidden)
 
                 if visibleTransactions.isEmpty {
