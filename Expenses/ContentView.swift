@@ -98,39 +98,80 @@ struct DashboardView: View {
         store.filtered(monthOnly: monthOnly, category: selectedCategory)
     }
 
+    private var filteredTotal: Double {
+        visibleTransactions.reduce(0) { $0 + ($1.category == "Income" ? 0 : $1.effectiveAmount) }
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
+        List {
+            Section {
                 if let error = store.errorMessage {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .font(.footnote).foregroundStyle(.red)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(Color.red.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
 
                 HeroSummary(total: store.total(monthOnly: monthOnly),
                             monthOnly: monthOnly,
                             count: store.filtered(monthOnly: monthOnly, category: nil).count)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 6, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
 
                 Picker("Scope", selection: $monthOnly) {
                     Text("This month").tag(true)
                     Text("All time").tag(false)
                 }
                 .pickerStyle(.segmented)
+                .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
 
                 CategoryFilterBar(categories: quickPickCategories, selected: $selectedCategory)
-
-                TransactionListCard(store: store,
-                                    transactions: visibleTransactions,
-                                    category: selectedCategory)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
-            .padding(16)
-            .animation(.snappy, value: monthOnly)
-            .animation(.snappy, value: selectedCategory)
+
+            Section {
+                if visibleTransactions.isEmpty {
+                    Text(store.isLoading ? "Loading…" : "No transactions here yet.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(visibleTransactions.prefix(100))) { tx in
+                        TransactionRow(tx: tx)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    Task { await store.delete(tx) }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                Button {
+                                    CaptureCoordinator.shared.beginEdit(tx)
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                            }
+                    }
+                }
+            } header: {
+                HStack {
+                    Text(selectedCategory ?? "All transactions")
+                    Spacer()
+                    if selectedCategory != nil {
+                        Text(inr(filteredTotal))
+                    }
+                }
+            }
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground))
+        .animation(.snappy, value: monthOnly)
+        .animation(.snappy, value: selectedCategory)
     }
 }
 
@@ -212,50 +253,8 @@ struct CategoryFilterBar: View {
 
 // MARK: - Transactions
 
-struct TransactionListCard: View {
-    @ObservedObject var store: Store
-    let transactions: [Transaction]
-    let category: String?
-
-    private var total: Double {
-        transactions.reduce(0) { $0 + ($1.category == "Income" ? 0 : $1.effectiveAmount) }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(category ?? "All transactions")
-                    .font(.headline)
-                Spacer()
-                if category != nil {
-                    Text(inr(total))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.bottom, 6)
-
-            if transactions.isEmpty {
-                Text(store.isLoading ? "Loading…" : "No transactions here yet.")
-                    .font(.subheadline).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 16)
-            } else {
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(transactions.prefix(100).enumerated()), id: \.element.id) { idx, tx in
-                        if idx > 0 { Divider().padding(.leading, 52) }
-                        TransactionRow(tx: tx, store: store)
-                    }
-                }
-            }
-        }
-        .cardStyle()
-    }
-}
-
 struct TransactionRow: View {
     let tx: Transaction
-    @ObservedObject var store: Store
 
     var body: some View {
         let style = CategoryStyle.of(tx.category)
@@ -285,20 +284,8 @@ struct TransactionRow: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(tx.category == "Income" ? Color.green : Color.primary)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 6)
         .contentShape(Rectangle())
-        .contextMenu {
-            Button {
-                CaptureCoordinator.shared.beginEdit(tx)
-            } label: {
-                Label("Edit", systemImage: "pencil")
-            }
-            Button(role: .destructive) {
-                Task { await store.delete(tx) }
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
     }
 }
 
