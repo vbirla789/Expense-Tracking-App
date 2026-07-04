@@ -220,10 +220,19 @@ struct HeroSummary: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.white.opacity(0.85))
+
+            Text(inr(total))
+                .font(.system(size: 42, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .contentTransition(.numericText())
+
             HStack {
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.85))
+                Label("\(count) transactions", systemImage: "list.bullet")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.9))
                 Spacer()
                 // Always in the layout so the card height never changes;
                 // just faded out (and untappable) in all-time mode.
@@ -234,16 +243,7 @@ struct HeroSummary: View {
                 .opacity(showsMonthNav ? 1 : 0)
                 .allowsHitTesting(showsMonthNav)
             }
-
-            Text(inr(total))
-                .font(.system(size: 42, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .contentTransition(.numericText())
-
-            Label("\(count) transactions", systemImage: "list.bullet")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.white.opacity(0.9))
-                .padding(.top, 6)
+            .padding(.top, 6)
         }
         .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -290,6 +290,9 @@ struct CategoryFilterBar: View {
                 }
             }
         }
+        // Solid page-coloured fill (with bleed) so no system platter /
+        // row background shows as a rounded band behind the pills.
+        .background(Color(.systemGroupedBackground).padding(-10))
     }
 
     private func chip(title: String, icon: String, color: Color, isOn: Bool, action: @escaping () -> Void) -> some View {
