@@ -87,18 +87,44 @@ struct CategoryStyle {
 struct DashboardView: View {
     @ObservedObject var store: Store
     @State private var monthOnly = true
+    @State private var monthAnchor = Date()        // which month is shown (when monthOnly)
     @State private var selectedCategory: String?   // nil = All
 
+    /// nil = all time, else the calendar month to show.
+    private var scopeMonth: Date? { monthOnly ? monthAnchor : nil }
+
     private var visibleTransactions: [Transaction] {
-        store.filtered(monthOnly: monthOnly, category: selectedCategory)
+        store.filtered(month: scopeMonth, category: selectedCategory)
     }
 
     private var filteredTotal: Double {
         visibleTransactions.reduce(0) { $0 + ($1.category == "Income" ? 0 : $1.effectiveAmount) }
     }
 
+    private var monthLabel: String {
+        let cal = Calendar.current
+        let sameYear = cal.isDate(monthAnchor, equalTo: Date(), toGranularity: .year)
+        return monthAnchor.formatted(sameYear ? .dateTime.month(.wide)
+                                              : .dateTime.month(.abbreviated).year())
+    }
+
     private var heroTitle: String {
-        monthOnly ? "Spent in \(Date().formatted(.dateTime.month(.wide)))" : "Spent all time"
+        monthOnly ? "Spent in \(monthLabel)" : "Spent all time"
+    }
+
+    private var canGoBack: Bool {
+        guard let earliest = store.earliestDate else { return false }
+        return Calendar.current.compare(monthAnchor, to: earliest, toGranularity: .month) == .orderedDescending
+    }
+
+    private var canGoForward: Bool {
+        !Calendar.current.isDate(monthAnchor, equalTo: Date(), toGranularity: .month)
+    }
+
+    private func stepMonth(_ delta: Int) {
+        if let d = Calendar.current.date(byAdding: .month, value: delta, to: monthAnchor) {
+            monthAnchor = d
+        }
     }
 
     var body: some View {
@@ -113,14 +139,18 @@ struct DashboardView: View {
                 }
 
                 HeroSummary(title: heroTitle,
-                            total: store.total(monthOnly: monthOnly),
-                            count: store.filtered(monthOnly: monthOnly, category: nil).count)
+                            total: store.total(month: scopeMonth),
+                            count: store.filtered(month: scopeMonth, category: nil).count,
+                            showsMonthNav: monthOnly,
+                            canGoBack: canGoBack,
+                            canGoForward: canGoForward,
+                            onStep: stepMonth)
                     .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 6, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
 
                 Picker("Scope", selection: $monthOnly) {
-                    Text("This month").tag(true)
+                    Text("Monthly").tag(true)
                     Text("All time").tag(false)
                 }
                 .pickerStyle(.segmented)
@@ -150,7 +180,8 @@ struct DashboardView: View {
                 .listRowSeparator(.hidden)
 
                 if visibleTransactions.isEmpty {
-                    EmptyTransactions(category: selectedCategory, monthOnly: monthOnly)
+                    EmptyTransactions(category: selectedCategory,
+                                      monthLabel: monthOnly ? monthLabel : nil)
                         .listRowSeparator(.hidden)
                 } else {
                     ForEach(Array(visibleTransactions.prefix(100))) { tx in
@@ -177,6 +208,7 @@ struct DashboardView: View {
         .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground))
         .animation(.snappy, value: monthOnly)
+        .animation(.snappy, value: monthAnchor)
         .animation(.snappy, value: selectedCategory)
     }
 }
@@ -185,12 +217,25 @@ struct HeroSummary: View {
     let title: String
     let total: Double
     let count: Int
+    var showsMonthNav = false
+    var canGoBack = false
+    var canGoForward = false
+    var onStep: (Int) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.white.opacity(0.85))
+            HStack {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                Spacer()
+                if showsMonthNav {
+                    HStack(spacing: 8) {
+                        navButton("chevron.left", enabled: canGoBack) { onStep(-1) }
+                        navButton("chevron.right", enabled: canGoForward) { onStep(1) }
+                    }
+                }
+            }
 
             Text(inr(total))
                 .font(.system(size: 42, weight: .bold, design: .rounded))
@@ -209,7 +254,21 @@ struct HeroSummary: View {
                            startPoint: .topLeading, endPoint: .bottomTrailing)
         )
         .clipShape(RoundedRectangle(cornerRadius: 24))
-        .shadow(color: Color.accentColor.opacity(0.3), radius: 12, y: 6)
+        // (no shadow: inside a List row it gets clipped to a rectangle and
+        // shows as a broken band around the card)
+    }
+
+    private func navButton(_ icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 28, height: 28)
+                .background(.white.opacity(enabled ? 0.22 : 0.10), in: Circle())
+                .opacity(enabled ? 1 : 0.45)
+        }
+        .buttonStyle(.borderless)   // isolate taps inside the List row
+        .disabled(!enabled)
     }
 }
 
@@ -295,14 +354,15 @@ struct TransactionRow: View {
 
 struct EmptyTransactions: View {
     let category: String?
-    let monthOnly: Bool
+    let monthLabel: String?   // nil = all time
 
     private var icon: String {
         category.map { CategoryStyle.of($0).icon } ?? "tray"
     }
     private var title: String {
         if let c = category { return "No \(c) yet" }
-        return monthOnly ? "Nothing spent this month" : "No transactions yet"
+        if let m = monthLabel { return "Nothing spent in \(m)" }
+        return "No transactions yet"
     }
     private var subtitle: String {
         category != nil

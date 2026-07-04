@@ -87,39 +87,31 @@ final class Store: ObservableObject {
         spend.reduce(0) { $0 + $1.amount }
     }
 
-    /// (category, total) for the current month, biggest first.
-    var categoryBreakdown: [(name: String, amount: Double)] {
-        breakdown(monthOnly: true)
+    // MARK: - Scoped queries (month == nil → all time, else that calendar month)
+
+    private func isIn(_ d: Date, month: Date) -> Bool {
+        Calendar.current.isDate(d, equalTo: month, toGranularity: .month)
     }
 
-    // MARK: - Scoped queries (monthOnly == true → this month, false → all time)
+    /// Date of the oldest transaction — lower bound for month navigation.
+    var earliestDate: Date? { transactions.map(\.date).min() }
 
     /// Total spend for the chosen scope (splits count only your share).
-    func total(monthOnly: Bool) -> Double {
-        spend.filter { !monthOnly || isThisMonth($0.date) }.reduce(0) { $0 + $1.effectiveAmount }
-    }
-
-    /// (category, total) for the chosen scope, biggest first.
-    func breakdown(monthOnly: Bool) -> [(name: String, amount: Double)] {
-        var dict: [String: Double] = [:]
-        for t in spend where (!monthOnly || isThisMonth(t.date)) {
-            dict[t.category, default: 0] += t.effectiveAmount
+    func total(month: Date?) -> Double {
+        spend.filter { tx in
+            if let month { return isIn(tx.date, month: month) }
+            return true
         }
-        return dict.sorted { $0.value > $1.value }.map { (name: $0.key, amount: $0.value) }
-    }
-
-    /// All transactions in one category, for the drill-down filter view.
-    func transactions(in category: String, monthOnly: Bool) -> [Transaction] {
-        transactions.filter { $0.category == category && (!monthOnly || isThisMonth($0.date)) }
+        .reduce(0) { $0 + $1.effectiveAmount }
     }
 
     /// Transactions for the current scope, optionally filtered to one category
     /// (category == nil means "All"). "Others" is a catch-all for any category
     /// that isn't one of the main pills (so custom categories land there too).
-    func filtered(monthOnly: Bool, category: String?) -> [Transaction] {
+    func filtered(month: Date?, category: String?) -> [Transaction] {
         let mains: Set<String> = ["Cab", "Sutta", "Groceries", "Outing", "Rent", "Income"]
         return transactions.filter { tx in
-            guard !monthOnly || isThisMonth(tx.date) else { return false }
+            if let month, !isIn(tx.date, month: month) { return false }
             guard let category else { return true }            // All
             if category == "Others" { return !mains.contains(tx.category) }
             return tx.category == category
