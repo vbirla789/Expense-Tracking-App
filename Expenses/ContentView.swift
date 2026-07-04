@@ -130,38 +130,34 @@ struct DashboardView: View {
     var body: some View {
         List {
             Section {
-                if let error = store.errorMessage {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.footnote).foregroundStyle(.red)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                }
+                // One row so the 16pt gaps are exact (List adds quirky
+                // spacing between separate rows).
+                VStack(spacing: 16) {
+                    if let error = store.errorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote).foregroundStyle(.red)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
 
-                Picker("Scope", selection: $monthOnly) {
-                    Text("Monthly").tag(true)
-                    Text("All time").tag(false)
+                    Picker("Scope", selection: $monthOnly) {
+                        Text("Monthly").tag(true)
+                        Text("All time").tag(false)
+                    }
+                    .pickerStyle(.segmented)
+
+                    HeroSummary(title: heroTitle,
+                                total: store.total(month: scopeMonth),
+                                count: store.filtered(month: scopeMonth, category: nil).count,
+                                showsMonthNav: monthOnly,
+                                canGoBack: canGoBack,
+                                canGoForward: canGoForward,
+                                onStep: stepMonth)
+
+                    CategoryFilterBar(categories: quickPickCategories, selected: $selectedCategory)
                 }
-                .pickerStyle(.segmented)
-                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 4, trailing: 0))
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 0, trailing: 0))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-
-                HeroSummary(title: heroTitle,
-                            total: store.total(month: scopeMonth),
-                            count: store.filtered(month: scopeMonth, category: nil).count,
-                            showsMonthNav: monthOnly,
-                            canGoBack: canGoBack,
-                            canGoForward: canGoForward,
-                            onStep: stepMonth)
-                    .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 6, trailing: 0))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-
-                CategoryFilterBar(categories: quickPickCategories, selected: $selectedCategory)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 8, trailing: 0))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
             }
 
             Section {
@@ -204,7 +200,7 @@ struct DashboardView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .listSectionSpacing(14)
+        .listSectionSpacing(12)   // filters → transactions card (internal gap)
         .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground))
         .animation(.snappy, value: monthOnly)
@@ -293,8 +289,6 @@ struct CategoryFilterBar: View {
                     }
                 }
             }
-            .padding(.horizontal, 2)
-            .padding(.vertical, 2)
         }
     }
 
