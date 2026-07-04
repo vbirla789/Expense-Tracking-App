@@ -155,8 +155,14 @@ struct DashboardView: View {
 
                     CategoryFilterBar(categories: quickPickCategories, selected: $selectedCategory)
                 }
+                // Solid page-coloured backgrounds at BOTH the content and the
+                // row layer: iOS 26 renders a subtle glass platter on list
+                // cells that Color.clear leaves visible (rounded band on
+                // device); an opaque same-as-page fill covers it at whichever
+                // layer it lives.
+                .background(Color(.systemGroupedBackground))
                 .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 0, trailing: 0))
-                .listRowBackground(Color.clear)
+                .listRowBackground(Color(.systemGroupedBackground))
                 .listRowSeparator(.hidden)
             }
 
@@ -202,6 +208,7 @@ struct DashboardView: View {
         .listStyle(.insetGrouped)
         .listSectionSpacing(12)   // filters → transactions card (internal gap)
         .scrollContentBackground(.hidden)
+        .noScrollEdgeEffect()     // the platter may belong to the List's own scroller
         .background(Color(.systemGroupedBackground))
         .animation(.snappy, value: monthOnly)
         .animation(.snappy, value: monthAnchor)
