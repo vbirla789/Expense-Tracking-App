@@ -138,6 +138,15 @@ struct DashboardView: View {
                         .listRowSeparator(.hidden)
                 }
 
+                Picker("Scope", selection: $monthOnly) {
+                    Text("Monthly").tag(true)
+                    Text("All time").tag(false)
+                }
+                .pickerStyle(.segmented)
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 4, trailing: 0))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+
                 HeroSummary(title: heroTitle,
                             total: store.total(month: scopeMonth),
                             count: store.filtered(month: scopeMonth, category: nil).count,
@@ -145,18 +154,9 @@ struct DashboardView: View {
                             canGoBack: canGoBack,
                             canGoForward: canGoForward,
                             onStep: stepMonth)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 6, trailing: 0))
+                    .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 6, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-
-                Picker("Scope", selection: $monthOnly) {
-                    Text("Monthly").tag(true)
-                    Text("All time").tag(false)
-                }
-                .pickerStyle(.segmented)
-                .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0))
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
 
                 CategoryFilterBar(categories: quickPickCategories, selected: $selectedCategory)
                     .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 8, trailing: 0))
@@ -229,12 +229,14 @@ struct HeroSummary: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.white.opacity(0.85))
                 Spacer()
-                if showsMonthNav {
-                    HStack(spacing: 8) {
-                        navButton("chevron.left", enabled: canGoBack) { onStep(-1) }
-                        navButton("chevron.right", enabled: canGoForward) { onStep(1) }
-                    }
+                // Always in the layout so the card height never changes;
+                // just faded out (and untappable) in all-time mode.
+                HStack(spacing: 8) {
+                    navButton("chevron.left", enabled: canGoBack) { onStep(-1) }
+                    navButton("chevron.right", enabled: canGoForward) { onStep(1) }
                 }
+                .opacity(showsMonthNav ? 1 : 0)
+                .allowsHitTesting(showsMonthNav)
             }
 
             Text(inr(total))
