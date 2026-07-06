@@ -450,16 +450,18 @@ struct Pulse: ViewModifier {
 
 // MARK: - Shared helpers
 
-/// "Today" / "Yesterday" / weekday (within a week) / abbreviated date.
+private let fullDayFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "d MMMM yyyy"   // 6 July 2026
+    return f
+}()
+
+/// "Today" / "Yesterday" / "6 July 2026".
 func relativeDay(_ date: Date) -> String {
     let cal = Calendar.current
     if cal.isDateInToday(date) { return "Today" }
     if cal.isDateInYesterday(date) { return "Yesterday" }
-    let days = cal.dateComponents([.day],
-                                  from: cal.startOfDay(for: date),
-                                  to: cal.startOfDay(for: Date())).day ?? 0
-    if days > 0 && days < 7 { return date.formatted(.dateTime.weekday(.wide)) }
-    return date.formatted(date: .abbreviated, time: .omitted)
+    return fullDayFormatter.string(from: date)
 }
 
 @ViewBuilder
