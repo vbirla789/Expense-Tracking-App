@@ -1,27 +1,24 @@
 import SwiftUI
 
-// MARK: - Palette (soft light surfaces, ink-navy text; adapts to dark mode)
+// MARK: - Palette (light theme only — the app is locked to .light)
 
 extension Color {
-    private static func dynamic(light: UIColor, dark: UIColor) -> Color {
-        Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? dark : light })
+    private static func rgb(_ r: Double, _ g: Double, _ b: Double) -> Color {
+        Color(red: r / 255, green: g / 255, blue: b / 255)
     }
 
     /// Page background — soft lavender grey.
-    static let pageBG = dynamic(light: UIColor(red: 0.933, green: 0.933, blue: 0.953, alpha: 1),
-                                dark:  UIColor(red: 0.063, green: 0.070, blue: 0.094, alpha: 1))
+    static let pageBG = rgb(238, 238, 243)
     /// Card / key / chip surface.
-    static let cardBG = dynamic(light: .white,
-                                dark:  UIColor(red: 0.110, green: 0.122, blue: 0.149, alpha: 1))
+    static let cardBG = Color.white
     /// Primary text — ink navy.
-    static let ink = dynamic(light: UIColor(red: 0.149, green: 0.188, blue: 0.298, alpha: 1),
-                             dark:  UIColor(red: 0.914, green: 0.922, blue: 0.949, alpha: 1))
+    static let ink = rgb(38, 48, 76)
     /// Secondary text — muted blue grey.
-    static let inkSecondary = dynamic(light: UIColor(red: 0.541, green: 0.565, blue: 0.659, alpha: 1),
-                                      dark:  UIColor(red: 0.545, green: 0.569, blue: 0.651, alpha: 1))
-    /// Track behind the scope toggle.
-    static let toggleTrack = dynamic(light: UIColor(red: 0.886, green: 0.890, blue: 0.922, alpha: 1),
-                                     dark:  UIColor(red: 0.149, green: 0.165, blue: 0.200, alpha: 1))
+    static let inkSecondary = rgb(138, 144, 168)
+    /// Track behind the scope toggle / selected chip fill.
+    static let toggleTrack = rgb(226, 227, 235)
+    /// Hero surface — near-black, as in the reference wallets.
+    static let heroBG = rgb(17, 18, 22)
 }
 
 struct ContentView: View {
@@ -277,10 +274,7 @@ struct HeroSummary: View {
         }
         .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.65)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-        )
+        .background(Color.heroBG)
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         // (no shadow: inside a List row it gets clipped to a rectangle and
         // shows as a broken band around the card)
@@ -372,10 +366,10 @@ struct CategoryFilterBar: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
-            .background(Color.cardBG, in: Capsule())
-            // Selection = orange outline only (no fill), so the chip keeps its
-            // surface colour and the active one is still obvious.
-            .overlay(Capsule().strokeBorder(isOn ? Color.accentColor : .clear, lineWidth: 2))
+            // Selected = light grey fill + a thin ink stroke; unselected stays
+            // a plain white chip.
+            .background(isOn ? Color.toggleTrack : Color.cardBG, in: Capsule())
+            .overlay(Capsule().strokeBorder(isOn ? Color.ink : .clear, lineWidth: 1.5))
         }
         .buttonStyle(.plain)
     }
