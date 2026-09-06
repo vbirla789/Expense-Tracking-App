@@ -27,7 +27,9 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
+            // ZStack + opacity transitions so skeleton → dashboard cross-fades
+            // instead of snapping.
+            ZStack {
                 if !Settings.isConfigured {
                     ContentUnavailableView {
                         Label("Not connected", systemImage: "link")
@@ -37,12 +39,16 @@ struct ContentView: View {
                         Button("Open Settings") { showSettings = true }
                             .buttonStyle(.borderedProminent)
                     }
+                    .transition(.opacity)
                 } else if !store.hasLoaded {
                     LoadingSkeleton()
+                        .transition(.opacity)
                 } else {
                     DashboardView(store: store)
+                        .transition(.opacity)
                 }
             }
+            .animation(.easeInOut(duration: 0.3), value: store.hasLoaded)
             .navigationTitle("Expenses")
             .background(Color.pageBG)
             .overlay(alignment: .bottom) {
@@ -353,6 +359,11 @@ struct CategoryFilterBar: View {
                 }
             }
         }
+        // Full-bleed: the list section is inset 16pt, so pull the scroller out
+        // to the screen edges and put that 16pt back as scroll content margin.
+        // Chips then start aligned with the cards but scroll edge to edge.
+        .contentMargins(.horizontal, 16, for: .scrollContent)
+        .padding(.horizontal, -16)
         // iOS 26 draws a rounded glass "lens" platter over horizontal
         // scrollers in lists — hide it (visible as a band behind the pills).
         .noScrollEdgeEffect()
@@ -461,8 +472,8 @@ struct SwipeableRow<Content: View>: View {
     var body: some View {
         ZStack(alignment: .trailing) {
             HStack(spacing: 0) {
-                action("pencil", Color.accentColor, perform: onEdit)
-                action("trash", Color(red: 0.93, green: 0.26, blue: 0.26), perform: onDelete)
+                action("pencil", Color.blue, perform: onEdit)
+                action("trash", Color.red, perform: onDelete)
             }
             .frame(width: openWidth, height: rowHeight)
 
@@ -476,8 +487,8 @@ struct SwipeableRow<Content: View>: View {
             .background(
                 GeometryReader { geo in
                     Color.clear
-                        .onAppear { rowHeight = geo.size.height }
-                        .onChange(of: geo.size.height) { _, h in rowHeight = h }
+                        .onAppear { setHeight(geo.size.height) }
+                        .onChange(of: geo.size.height) { _, h in setHeight(h) }
                 }
             )
             .offset(x: offset)
@@ -497,6 +508,13 @@ struct SwipeableRow<Content: View>: View {
                     openOffset = offset
                 }
         )
+    }
+
+    /// Height updates must not inherit the List's row animations, or the
+    /// action blocks visibly stretch while rows are inserted/filtered.
+    private func setHeight(_ h: CGFloat) {
+        guard h != rowHeight else { return }
+        withAnimation(nil) { rowHeight = h }   // `Transaction` is our model type
     }
 
     private func action(_ icon: String, _ fill: Color, perform: @escaping () -> Void) -> some View {
@@ -606,9 +624,14 @@ struct Pulse: ViewModifier {
     @State private var dim = false
     func body(content: Content) -> some View {
         content
-            .opacity(dim ? 0.5 : 1)
-            .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: dim)
-            .onAppear { dim = true }
+            .opacity(dim ? 0.55 : 1)
+            .animation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: dim)
+            .task {
+                // Start on the next runloop tick so the first frame renders at
+                // full opacity — starting in onAppear can drop the animation.
+                try? await Task.sleep(for: .milliseconds(30))
+                dim = true
+            }
     }
 }
 
