@@ -373,9 +373,9 @@ struct CategoryFilterBar: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
             .background(Color.cardBG, in: Capsule())
-            // Selection = outline only (no fill), so the chip keeps its
+            // Selection = orange outline only (no fill), so the chip keeps its
             // surface colour and the active one is still obvious.
-            .overlay(Capsule().strokeBorder(isOn ? Color.ink : .clear, lineWidth: 2))
+            .overlay(Capsule().strokeBorder(isOn ? Color.accentColor : .clear, lineWidth: 2))
         }
         .buttonStyle(.plain)
     }
