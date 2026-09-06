@@ -8,6 +8,20 @@ final class Store: ObservableObject {
     @Published var isLoading = false
     @Published var hasLoaded = false
     @Published var errorMessage: String?
+    /// Transient confirmation shown as a toast on the dashboard.
+    @Published var toast: String?
+
+    private var toastTask: Task<Void, Never>?
+
+    private func showToast(_ message: String) {
+        toast = message
+        toastTask?.cancel()
+        toastTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2.2))
+            guard !Task.isCancelled else { return }
+            self?.toast = nil
+        }
+    }
 
     func load() async {
         isLoading = true
@@ -32,6 +46,7 @@ final class Store: ObservableObject {
             try await ExpenseAPI.add(amount: amount, merchant: merchant,
                                      category: category, source: "manual", raw: note)
             await load()
+            showToast("\(inr(amount)) added to \(category)")
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -57,6 +72,7 @@ final class Store: ObservableObject {
                                      raw: note, timestamp: tx.timestamp)
             try await ExpenseAPI.delete(id: tx.id)
             await load()
+            showToast("Changes saved")
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -66,6 +82,7 @@ final class Store: ObservableObject {
         do {
             try await ExpenseAPI.delete(id: tx.id)
             transactions.removeAll { $0.id == tx.id }
+            showToast("Transaction deleted")
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -45,6 +45,14 @@ struct ContentView: View {
             }
             .navigationTitle("Expenses")
             .background(Color.pageBG)
+            .overlay(alignment: .bottom) {
+                if let toast = store.toast {
+                    ToastView(text: toast)
+                        .padding(.bottom, 28)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.snappy(duration: 0.3), value: store.toast)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showSettings = true } label: { Image(systemName: "gearshape") }
@@ -170,22 +178,17 @@ struct DashboardView: View {
                         .listRowBackground(Color.cardBG)
                         .listRowSeparator(.hidden)
                 } else {
-                    ForEach(Array(visibleTransactions.prefix(100))) { tx in
-                        TransactionRow(tx: tx)
-                            .listRowBackground(Color.cardBG)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    Task { await store.delete(tx) }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                                Button {
-                                    CaptureCoordinator.shared.beginEdit(tx)
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .tint(.blue)
-                            }
+                    let rows = Array(visibleTransactions.prefix(100))
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, tx in
+                        SwipeableRow(showsDivider: index < rows.count - 1,
+                                     onEdit: { CaptureCoordinator.shared.beginEdit(tx) },
+                                     onDelete: { Task { await store.delete(tx) } }) {
+                            TransactionRow(tx: tx)
+                                .padding(.horizontal, 16)
+                        }
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.cardBG)
+                        .listRowSeparator(.hidden)
                     }
                 }
             } header: {
@@ -412,6 +415,104 @@ struct TransactionRow: View {
         }
         .padding(.vertical, 6)
         .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Toast
+
+struct ToastView: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.subheadline)
+                .foregroundStyle(Color.accentColor)
+            Text(text)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color.ink, in: Capsule())
+        .shadow(color: .black.opacity(0.20), radius: 14, y: 5)
+    }
+}
+
+// MARK: - Swipe actions (square, full-height — iOS 26 renders the built-in
+// .swipeActions as circular glass buttons, which can't be restyled)
+
+struct SwipeableRow<Content: View>: View {
+    var showsDivider = true
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    @ViewBuilder let content: Content
+
+    @State private var offset: CGFloat = 0
+    @State private var openOffset: CGFloat = 0
+    /// Buttons are pinned to exactly the row's height — letting them use
+    /// maxHeight: .infinity makes the ZStack taller than the content and they
+    /// peek out above/below it.
+    @State private var rowHeight: CGFloat = 0
+
+    private let actionWidth: CGFloat = 68
+    private var openWidth: CGFloat { actionWidth * 2 }
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            HStack(spacing: 0) {
+                action("pencil", Color.accentColor, perform: onEdit)
+                action("trash", Color(red: 0.93, green: 0.26, blue: 0.26), perform: onDelete)
+            }
+            .frame(width: openWidth, height: rowHeight)
+
+            VStack(spacing: 0) {
+                content
+                if showsDivider {
+                    Divider().padding(.leading, 66)
+                }
+            }
+            .background(Color.cardBG)
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear { rowHeight = geo.size.height }
+                        .onChange(of: geo.size.height) { _, h in rowHeight = h }
+                }
+            )
+            .offset(x: offset)
+        }
+        .gesture(
+            DragGesture(minimumDistance: 18, coordinateSpace: .local)
+                .onChanged { value in
+                    // Horizontal intent only, so vertical list scrolling still wins.
+                    guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                    offset = max(-openWidth, min(0, openOffset + value.translation.width))
+                }
+                .onEnded { value in
+                    let projected = openOffset + value.translation.width
+                    withAnimation(.snappy(duration: 0.25)) {
+                        offset = projected < -openWidth / 2 ? -openWidth : 0
+                    }
+                    openOffset = offset
+                }
+        )
+    }
+
+    private func action(_ icon: String, _ fill: Color, perform: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(.snappy(duration: 0.25)) { offset = 0 }
+            openOffset = 0
+            perform()
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: actionWidth)
+                .frame(maxHeight: .infinity)
+                .background(fill)
+        }
+        .buttonStyle(.plain)
     }
 }
 
