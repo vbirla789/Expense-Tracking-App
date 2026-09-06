@@ -424,7 +424,7 @@ struct TransactionRow: View {
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(tx.category == "Income" ? Color.green : Color.ink)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 12)
         .contentShape(Rectangle())
     }
 }
@@ -466,21 +466,27 @@ struct SwipeableRow<Content: View>: View {
     /// peek out above/below it.
     @State private var rowHeight: CGFloat = 0
 
-    private let actionWidth: CGFloat = 68
+    /// Square buttons: side == the row's height.
+    private var actionWidth: CGFloat { rowHeight > 0 ? rowHeight : 64 }
     private var openWidth: CGFloat { actionWidth * 2 }
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            HStack(spacing: 0) {
-                action("pencil", Color.blue, perform: onEdit)
-                action("trash", Color.red, perform: onDelete)
+            // Only exists while the row is actually swiped — otherwise the
+            // blocks render behind every row and flash in as the list
+            // re-animates (e.g. when the category filter changes).
+            if offset < 0 {
+                HStack(spacing: 0) {
+                    action("pencil", Color.blue, perform: onEdit)
+                    action("trash", Color.red, perform: onDelete)
+                }
+                .frame(width: openWidth, height: rowHeight)
             }
-            .frame(width: openWidth, height: rowHeight)
 
             VStack(spacing: 0) {
                 content
                 if showsDivider {
-                    Divider().padding(.leading, 66)
+                    Divider().padding(.leading, 68)
                 }
             }
             .background(Color.cardBG)
@@ -526,8 +532,7 @@ struct SwipeableRow<Content: View>: View {
             Image(systemName: icon)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: actionWidth)
-                .frame(maxHeight: .infinity)
+                .frame(width: actionWidth, height: actionWidth)   // square
                 .background(fill)
         }
         .buttonStyle(.plain)
