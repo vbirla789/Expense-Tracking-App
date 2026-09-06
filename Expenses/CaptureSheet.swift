@@ -16,6 +16,9 @@ struct CaptureSheet: View {
     @State private var isSplit = false
     @State private var splitPeople: [String] = []
     @State private var showContacts = false
+    /// Amount normally arrives pre-filled, so the keypad stays hidden until
+    /// the amount card is tapped.
+    @State private var showKeypad = false
 
     private var amountValue: Double? { Double(amount) }
     private var isSplitting: Bool { isSplit && !splitPeople.isEmpty }
@@ -46,7 +49,10 @@ struct CaptureSheet: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 splitSection
-                Keypad(onTap: keyTapped)
+                if showKeypad {
+                    Keypad(onTap: keyTapped)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 20)
@@ -122,26 +128,44 @@ struct CaptureSheet: View {
 
     // MARK: - Pieces
 
+    /// Tapping the card reveals/hides the keypad (amount is usually pre-filled).
     private var amountCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(isSplitting ? "Total bill" : "Amount")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(Color.inkSecondary)
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("₹")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(amount.isEmpty ? Color.inkSecondary : Color.ink)
-                Text(amount.isEmpty ? "0" : amount)
-                    .font(.system(size: 40, weight: .bold, design: .rounded))
-                    .foregroundStyle(amount.isEmpty ? Color.inkSecondary.opacity(0.6) : Color.ink)
-                    .contentTransition(.numericText())
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
+        Button {
+            withAnimation(.snappy(duration: 0.3)) { showKeypad.toggle() }
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(isSplitting ? "Total bill" : "Amount")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Color.inkSecondary)
+                    Spacer()
+                    Image(systemName: showKeypad ? "chevron.down" : "keyboard")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Color.inkSecondary)
+                        .frame(width: 30, height: 30)
+                        .background(Color.toggleTrack, in: Circle())
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("₹")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(amount.isEmpty ? Color.inkSecondary : Color.ink)
+                    Text(amount.isEmpty ? "0" : amount)
+                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .foregroundStyle(amount.isEmpty ? Color.inkSecondary.opacity(0.6) : Color.ink)
+                        .contentTransition(.numericText())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                }
             }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.cardBG, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(showKeypad ? Color.ink : .clear, lineWidth: 2)
+            )
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.cardBG, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .buttonStyle(.plain)
         .animation(.snappy(duration: 0.15), value: amount)
     }
 

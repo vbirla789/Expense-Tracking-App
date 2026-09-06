@@ -306,11 +306,11 @@ struct ScopeToggle: View {
     @Binding var monthOnly: Bool
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             option("Monthly", value: true)
             option("All time", value: false)
         }
-        .padding(4)
+        .padding(3)
         .background(Color.toggleTrack, in: Capsule())
     }
 
@@ -320,10 +320,10 @@ struct ScopeToggle: View {
             withAnimation(.snappy(duration: 0.25)) { monthOnly = value }
         } label: {
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(isOn ? Color.ink : Color.inkSecondary)
                 .frame(maxWidth: .infinity)
-                .frame(height: 38)
+                .frame(height: 26)   // + 3pt padding each side = 32pt, as before
                 .background {
                     if isOn {
                         Capsule().fill(Color.cardBG)
