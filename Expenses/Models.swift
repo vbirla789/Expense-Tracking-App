@@ -65,3 +65,13 @@ func inr(_ value: Double) -> String {
     f.maximumFractionDigits = 0
     return f.string(from: NSNumber(value: value)) ?? "₹\(Int(value))"
 }
+
+/// Digits only with Indian grouping (no ₹), e.g. 1,00,000 — for layouts
+/// that draw the currency symbol separately.
+func inrDigits(_ value: Double) -> String {
+    let f = NumberFormatter()
+    f.numberStyle = .decimal
+    f.locale = Locale(identifier: "en_IN")
+    f.maximumFractionDigits = 0
+    return f.string(from: NSNumber(value: value)) ?? "\(Int(value))"
+}

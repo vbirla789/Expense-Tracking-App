@@ -155,14 +155,10 @@ struct DashboardView: View {
 
                     CategoryFilterBar(categories: quickPickCategories, selected: $selectedCategory)
                 }
-                // Solid page-coloured backgrounds at BOTH the content and the
-                // row layer: iOS 26 renders a subtle glass platter on list
-                // cells that Color.clear leaves visible (rounded band on
-                // device); an opaque same-as-page fill covers it at whichever
-                // layer it lives.
-                .background(Color(.systemGroupedBackground))
+                // Row background must stay CLEAR: an opaque colour makes the
+                // iOS 26 cell draw its rounded card and clip the pills to it.
                 .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 0, trailing: 0))
-                .listRowBackground(Color(.systemGroupedBackground))
+                .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             }
 
@@ -242,10 +238,18 @@ struct HeroSummary: View {
                 .allowsHitTesting(showsMonthNav)
             }
 
-            Text(inr(total))
-                .font(.system(size: 42, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .contentTransition(.numericText())
+            // ₹ drawn separately: SF Rounded has no rupee glyph, so inside the
+            // big rounded-bold text it falls back to a mismatched font and
+            // looks broken. A deliberate smaller-weight symbol reads cleanly.
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text("₹")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.95))
+                Text(inrDigits(total))
+                    .font(.system(size: 42, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .contentTransition(.numericText())
+            }
 
             Label("\(count) transactions", systemImage: "list.bullet")
                 .font(.caption.weight(.medium))
