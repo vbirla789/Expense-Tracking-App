@@ -15,10 +15,8 @@ extension Color {
     static let ink = rgb(38, 48, 76)
     /// Secondary text — muted blue grey.
     static let inkSecondary = rgb(138, 144, 168)
-    /// Track behind the scope toggle / selected chip fill.
+    /// Track behind the scope toggle.
     static let toggleTrack = rgb(226, 227, 235)
-    /// Hero surface — near-black, as in the reference wallets.
-    static let heroBG = rgb(17, 18, 22)
 }
 
 struct ContentView: View {
@@ -274,7 +272,10 @@ struct HeroSummary: View {
         }
         .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.heroBG)
+        .background(
+            LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.65)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         // (no shadow: inside a List row it gets clipped to a rectangle and
         // shows as a broken band around the card)
@@ -366,10 +367,9 @@ struct CategoryFilterBar: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
-            // Selected = light grey fill + a thin ink stroke; unselected stays
-            // a plain white chip.
-            .background(isOn ? Color.toggleTrack : Color.cardBG, in: Capsule())
-            .overlay(Capsule().strokeBorder(isOn ? Color.ink : .clear, lineWidth: 1.5))
+            // Selected = soft orange tint fill (no stroke); unselected stays a
+            // plain white chip.
+            .background(isOn ? Color.accentColor.opacity(0.14) : Color.cardBG, in: Capsule())
         }
         .buttonStyle(.plain)
     }
