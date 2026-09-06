@@ -154,35 +154,6 @@ struct DashboardView: View {
     var body: some View {
         List {
             Section {
-                // One row so the 16pt gaps are exact (List adds quirky
-                // spacing between separate rows).
-                VStack(spacing: 16) {
-                    if let error = store.errorMessage {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .font(.footnote).foregroundStyle(.red)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    ScopeToggle(monthOnly: $monthOnly)
-
-                    HeroSummary(title: heroTitle,
-                                total: store.total(month: scopeMonth),
-                                count: store.filtered(month: scopeMonth, category: nil).count,
-                                showsMonthNav: monthOnly,
-                                canGoBack: canGoBack,
-                                canGoForward: canGoForward,
-                                onStep: stepMonth)
-
-                    CategoryFilterBar(categories: quickPickCategories, selected: $selectedCategory)
-                }
-                // Row background must stay CLEAR: an opaque colour makes the
-                // iOS 26 cell draw its rounded card and clip the pills to it.
-                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 0, trailing: 0))
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            }
-
-            Section {
                 HStack {
                     Text(selectedCategory ?? "All transactions")
                         .font(.subheadline.weight(.semibold))
@@ -222,10 +193,35 @@ struct DashboardView: View {
                             }
                     }
                 }
+            } header: {
+                // Lives in the SECTION HEADER, not a row: iOS 26 clips row
+                // content to the cell's rounded card, which cut the bottom of
+                // the filter chips on device. Headers are never drawn as cards.
+                VStack(spacing: 16) {
+                    if let error = store.errorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote).foregroundStyle(.red)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    ScopeToggle(monthOnly: $monthOnly)
+
+                    HeroSummary(title: heroTitle,
+                                total: store.total(month: scopeMonth),
+                                count: store.filtered(month: scopeMonth, category: nil).count,
+                                showsMonthNav: monthOnly,
+                                canGoBack: canGoBack,
+                                canGoForward: canGoForward,
+                                onStep: stepMonth)
+
+                    CategoryFilterBar(categories: quickPickCategories, selected: $selectedCategory)
+                }
+                .textCase(nil)
+                // bottom inset owns the 12pt pills → transactions card gap
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 12, trailing: 0))
             }
         }
         .listStyle(.insetGrouped)
-        .listSectionSpacing(12)   // filters → transactions card (internal gap)
         .scrollContentBackground(.hidden)
         .noScrollEdgeEffect()     // the platter may belong to the List's own scroller
         .background(Color.pageBG)
