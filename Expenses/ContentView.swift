@@ -1,22 +1,28 @@
 import SwiftUI
 
-// MARK: - Palette (light theme only — the app is locked to .light)
+// MARK: - Palette (adapts to light / dark)
 
 extension Color {
-    private static func rgb(_ r: Double, _ g: Double, _ b: Double) -> Color {
-        Color(red: r / 255, green: g / 255, blue: b / 255)
+    private static func rgb(_ r: Double, _ g: Double, _ b: Double) -> UIColor {
+        UIColor(red: r / 255, green: g / 255, blue: b / 255, alpha: 1)
     }
 
-    /// Page background — soft lavender grey.
-    static let pageBG = rgb(238, 238, 243)
+    private static func dynamic(_ light: UIColor, _ dark: UIColor) -> Color {
+        Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? dark : light })
+    }
+
+    /// Page background — soft lavender grey / near-black.
+    static let pageBG = dynamic(rgb(238, 238, 243), rgb(16, 18, 24))
     /// Card / key / chip surface.
-    static let cardBG = Color.white
-    /// Primary text — ink navy.
-    static let ink = rgb(38, 48, 76)
+    static let cardBG = dynamic(rgb(255, 255, 255), rgb(28, 31, 38))
+    /// Primary text — ink navy / off-white.
+    static let ink = dynamic(rgb(38, 48, 76), rgb(233, 235, 242))
     /// Secondary text — muted blue grey.
-    static let inkSecondary = rgb(138, 144, 168)
+    static let inkSecondary = dynamic(rgb(138, 144, 168), rgb(139, 145, 166))
     /// Track behind the scope toggle.
-    static let toggleTrack = rgb(226, 227, 235)
+    static let toggleTrack = dynamic(rgb(226, 227, 235), rgb(38, 42, 51))
+    /// Toast surface — stays dark in both themes (its text is always white).
+    static let toastBG = dynamic(rgb(38, 48, 76), rgb(52, 57, 70))
 }
 
 struct ContentView: View {
@@ -122,6 +128,7 @@ struct DashboardView: View {
     @State private var monthOnly = true
     @State private var monthAnchor = Date()        // which month is shown (when monthOnly)
     @State private var selectedCategory: String?   // nil = All
+    @State private var openRowID: String?          // only one swiped row at a time
 
     /// nil = all time, else the calendar month to show.
     private var scopeMonth: Date? { monthOnly ? monthAnchor : nil }
@@ -186,7 +193,9 @@ struct DashboardView: View {
                 } else {
                     let rows = Array(visibleTransactions.prefix(100))
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, tx in
-                        SwipeableRow(showsDivider: index < rows.count - 1,
+                        SwipeableRow(rowID: tx.id,
+                                     openRowID: $openRowID,
+                                     showsDivider: index < rows.count - 1,
                                      onEdit: { CaptureCoordinator.shared.beginEdit(tx) },
                                      onDelete: { Task { await store.delete(tx) } }) {
                             TransactionRow(tx: tx)
@@ -445,7 +454,7 @@ struct ToastView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color.ink, in: Capsule())
+        .background(Color.toastBG, in: Capsule())
         .shadow(color: .black.opacity(0.20), radius: 14, y: 5)
     }
 }
@@ -454,6 +463,9 @@ struct ToastView: View {
 // .swipeActions as circular glass buttons, which can't be restyled)
 
 struct SwipeableRow<Content: View>: View {
+    let rowID: String
+    /// Shared across rows so only one can be open at a time.
+    @Binding var openRowID: String?
     var showsDivider = true
     let onEdit: () -> Void
     let onDelete: () -> Void
@@ -504,16 +516,32 @@ struct SwipeableRow<Content: View>: View {
                 .onChanged { value in
                     // Horizontal intent only, so vertical list scrolling still wins.
                     guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                    // Claim the open slot as soon as this row starts moving —
+                    // any other open row closes itself via onChange below.
+                    if openRowID != rowID { openRowID = rowID }
                     offset = max(-openWidth, min(0, openOffset + value.translation.width))
                 }
                 .onEnded { value in
                     let projected = openOffset + value.translation.width
+                    let opening = projected < -openWidth / 2
                     withAnimation(.snappy(duration: 0.25)) {
-                        offset = projected < -openWidth / 2 ? -openWidth : 0
+                        offset = opening ? -openWidth : 0
                     }
                     openOffset = offset
+                    if !opening, openRowID == rowID { openRowID = nil }
                 }
         )
+        .onChange(of: openRowID) { _, current in
+            guard current != rowID, offset != 0 else { return }
+            withAnimation(.snappy(duration: 0.25)) { offset = 0 }
+            openOffset = 0
+        }
+    }
+
+    private func close() {
+        withAnimation(.snappy(duration: 0.25)) { offset = 0 }
+        openOffset = 0
+        if openRowID == rowID { openRowID = nil }
     }
 
     /// Height updates must not inherit the List's row animations, or the
@@ -525,8 +553,7 @@ struct SwipeableRow<Content: View>: View {
 
     private func action(_ icon: String, _ fill: Color, perform: @escaping () -> Void) -> some View {
         Button {
-            withAnimation(.snappy(duration: 0.25)) { offset = 0 }
-            openOffset = 0
+            close()
             perform()
         } label: {
             Image(systemName: icon)

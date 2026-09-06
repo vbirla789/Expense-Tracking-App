@@ -6,6 +6,7 @@ struct SettingsView: View {
 
     @State private var endpoint = Settings.endpoint
     @State private var token = Settings.token
+    @AppStorage("appTheme") private var appTheme = "system"
 
     var body: some View {
         NavigationStack {
@@ -23,6 +24,15 @@ struct SettingsView: View {
                     Text("Use the same Web App URL and SECRET from your Apps Script deployment. They're stored only on this device.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                }
+
+                Section("Appearance") {
+                    Picker("Theme", selection: $appTheme) {
+                        Text("System").tag("system")
+                        Text("Light").tag("light")
+                        Text("Dark").tag("dark")
+                    }
+                    .pickerStyle(.segmented)
                 }
             }
             .navigationTitle("Settings")
