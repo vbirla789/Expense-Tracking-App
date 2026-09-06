@@ -1,5 +1,29 @@
 import SwiftUI
 
+// MARK: - Palette (soft light surfaces, ink-navy text; adapts to dark mode)
+
+extension Color {
+    private static func dynamic(light: UIColor, dark: UIColor) -> Color {
+        Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? dark : light })
+    }
+
+    /// Page background — soft lavender grey.
+    static let pageBG = dynamic(light: UIColor(red: 0.933, green: 0.933, blue: 0.953, alpha: 1),
+                                dark:  UIColor(red: 0.063, green: 0.070, blue: 0.094, alpha: 1))
+    /// Card / key / chip surface.
+    static let cardBG = dynamic(light: .white,
+                                dark:  UIColor(red: 0.110, green: 0.122, blue: 0.149, alpha: 1))
+    /// Primary text — ink navy.
+    static let ink = dynamic(light: UIColor(red: 0.149, green: 0.188, blue: 0.298, alpha: 1),
+                             dark:  UIColor(red: 0.914, green: 0.922, blue: 0.949, alpha: 1))
+    /// Secondary text — muted blue grey.
+    static let inkSecondary = dynamic(light: UIColor(red: 0.541, green: 0.565, blue: 0.659, alpha: 1),
+                                      dark:  UIColor(red: 0.545, green: 0.569, blue: 0.651, alpha: 1))
+    /// Track behind the scope toggle.
+    static let toggleTrack = dynamic(light: UIColor(red: 0.886, green: 0.890, blue: 0.922, alpha: 1),
+                                     dark:  UIColor(red: 0.149, green: 0.165, blue: 0.200, alpha: 1))
+}
+
 struct ContentView: View {
     @StateObject private var store = Store()
     @StateObject private var capture = CaptureCoordinator.shared
@@ -25,7 +49,7 @@ struct ContentView: View {
                 }
             }
             .navigationTitle("Expenses")
-            .background(Color(.systemGroupedBackground))
+            .background(Color.pageBG)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showSettings = true } label: { Image(systemName: "gearshape") }
@@ -139,11 +163,7 @@ struct DashboardView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    Picker("Scope", selection: $monthOnly) {
-                        Text("Monthly").tag(true)
-                        Text("All time").tag(false)
-                    }
-                    .pickerStyle(.segmented)
+                    ScopeToggle(monthOnly: $monthOnly)
 
                     HeroSummary(title: heroTitle,
                                 total: store.total(month: scopeMonth),
@@ -166,24 +186,27 @@ struct DashboardView: View {
                 HStack {
                     Text(selectedCategory ?? "All transactions")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.inkSecondary)
                     Spacer()
                     if selectedCategory != nil {
                         Text(inr(filteredTotal))
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.inkSecondary)
                     }
                 }
                 .listRowInsets(EdgeInsets(top: 14, leading: 16, bottom: 0, trailing: 16))
+                .listRowBackground(Color.cardBG)
                 .listRowSeparator(.hidden)
 
                 if visibleTransactions.isEmpty {
                     EmptyTransactions(category: selectedCategory,
                                       monthLabel: monthOnly ? monthLabel : nil)
+                        .listRowBackground(Color.cardBG)
                         .listRowSeparator(.hidden)
                 } else {
                     ForEach(Array(visibleTransactions.prefix(100))) { tx in
                         TransactionRow(tx: tx)
+                            .listRowBackground(Color.cardBG)
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
                                     Task { await store.delete(tx) }
@@ -205,7 +228,7 @@ struct DashboardView: View {
         .listSectionSpacing(12)   // filters → transactions card (internal gap)
         .scrollContentBackground(.hidden)
         .noScrollEdgeEffect()     // the platter may belong to the List's own scroller
-        .background(Color(.systemGroupedBackground))
+        .background(Color.pageBG)
         .animation(.snappy, value: monthOnly)
         .animation(.snappy, value: monthAnchor)
         .animation(.snappy, value: selectedCategory)
@@ -262,7 +285,7 @@ struct HeroSummary: View {
             LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.65)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         // (no shadow: inside a List row it gets clipped to a rectangle and
         // shows as a broken band around the card)
     }
@@ -278,6 +301,41 @@ struct HeroSummary: View {
         }
         .buttonStyle(.borderless)   // isolate taps inside the List row
         .disabled(!enabled)
+    }
+}
+
+// MARK: - Scope toggle (soft pill switcher)
+
+struct ScopeToggle: View {
+    @Binding var monthOnly: Bool
+
+    var body: some View {
+        HStack(spacing: 4) {
+            option("Monthly", value: true)
+            option("All time", value: false)
+        }
+        .padding(4)
+        .background(Color.toggleTrack, in: Capsule())
+    }
+
+    private func option(_ title: String, value: Bool) -> some View {
+        let isOn = monthOnly == value
+        return Button {
+            withAnimation(.snappy(duration: 0.25)) { monthOnly = value }
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(isOn ? Color.ink : Color.inkSecondary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
+                .background {
+                    if isOn {
+                        Capsule().fill(Color.cardBG)
+                            .shadow(color: .black.opacity(0.10), radius: 5, y: 2)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -309,13 +367,16 @@ struct CategoryFilterBar: View {
     private func chip(title: String, icon: String, color: Color, isOn: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: icon).font(.caption2)
-                Text(title).font(.subheadline.weight(.medium))
+                Image(systemName: icon)
+                    .font(.caption2)
+                    .foregroundStyle(isOn ? Color.white : color)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(isOn ? Color.white : Color.ink)
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(isOn ? color : color.opacity(0.15))
-            .foregroundStyle(isOn ? Color.white : color)
+            .padding(.vertical, 9)
+            .background(isOn ? Color.accentColor : Color.cardBG)
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -335,7 +396,8 @@ struct TransactionRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(tx.category)
-                        .font(.subheadline.weight(.medium))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.ink)
                     if tx.isSplit {
                         Text("Split")
                             .font(.caption2.weight(.medium))
@@ -346,14 +408,14 @@ struct TransactionRow: View {
                 }
                 Text(relativeDay(tx.date))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.inkSecondary)
             }
 
             Spacer()
 
             Text((tx.category == "Income" ? "+" : "") + inr(tx.effectiveAmount))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(tx.category == "Income" ? Color.green : Color.primary)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(tx.category == "Income" ? Color.green : Color.ink)
         }
         .padding(.vertical, 6)
         .contentShape(Rectangle())
@@ -384,12 +446,13 @@ struct EmptyTransactions: View {
         VStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 34))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.inkSecondary)
             Text(title)
                 .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.ink)
             Text(subtitle)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.inkSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -400,11 +463,13 @@ struct EmptyTransactions: View {
 // MARK: - Loading skeleton
 
 struct LoadingSkeleton: View {
+    private var boneColor: Color { Color.toggleTrack }
+
     var body: some View {
         List {
             Section {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(Color(.secondarySystemGroupedBackground))
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(Color.cardBG)
                     .frame(height: 128)
                     .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                     .listRowBackground(Color.clear)
@@ -414,29 +479,30 @@ struct LoadingSkeleton: View {
                 ForEach(0..<6, id: \.self) { _ in
                     HStack(spacing: 12) {
                         Circle()
-                            .fill(Color(.tertiarySystemGroupedBackground))
+                            .fill(boneColor)
                             .frame(width: 40, height: 40)
                         VStack(alignment: .leading, spacing: 6) {
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(Color(.tertiarySystemGroupedBackground))
+                                .fill(boneColor)
                                 .frame(width: 110, height: 11)
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(Color(.tertiarySystemGroupedBackground))
+                                .fill(boneColor)
                                 .frame(width: 60, height: 9)
                         }
                         Spacer()
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color(.tertiarySystemGroupedBackground))
+                            .fill(boneColor)
                             .frame(width: 48, height: 11)
                     }
                     .padding(.vertical, 6)
+                    .listRowBackground(Color.cardBG)
                 }
             }
         }
         .listStyle(.insetGrouped)
         .listSectionSpacing(14)
         .scrollContentBackground(.hidden)
-        .background(Color(.systemGroupedBackground))
+        .background(Color.pageBG)
         .modifier(Pulse())
     }
 }

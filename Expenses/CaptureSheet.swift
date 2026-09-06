@@ -12,7 +12,7 @@ struct CaptureSheet: View {
     @State private var selected = ""
     @State private var custom = ""
     @State private var saving = false
-    @State private var formHeight: CGFloat = 360
+    @State private var formHeight: CGFloat = 620
     @State private var isSplit = false
     @State private var splitPeople: [String] = []
     @State private var showContacts = false
@@ -38,17 +38,18 @@ struct CaptureSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                amountField
+            VStack(spacing: 14) {
+                amountCard
                 pillGrid
                 if showCustom {
                     customField
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 splitSection
+                Keypad(onTap: keyTapped)
             }
             .padding(.horizontal, 16)
-            .padding(.top, 24)
+            .padding(.top, 20)
             .padding(.bottom, 8)
             .background(
                 GeometryReader { geo in
@@ -69,15 +70,15 @@ struct CaptureSheet: View {
             }
         )
         .safeAreaInset(edge: .bottom) {
-            saveButton
+            ctaRow
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
                 .padding(.bottom, 12)
-                .background(Color(.systemGroupedBackground))
+                .background(Color.pageBG)
         }
         .presentationDetents([.height(formHeight + 84)])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Color(.systemGroupedBackground))
+        .presentationBackground(Color.pageBG)
         .onAppear(perform: prefill)
         .onChange(of: isSplit) { _, on in
             if on && splitPeople.isEmpty { showContacts = true }
@@ -102,30 +103,53 @@ struct CaptureSheet: View {
         }
     }
 
+    // MARK: - Keypad input
+
+    private func keyTapped(_ key: String) {
+        switch key {
+        case "⌫":
+            if !amount.isEmpty { amount.removeLast() }
+        case ".":
+            if !amount.contains(".") { amount = amount.isEmpty ? "0." : amount + "." }
+        default:
+            // cap at 2 decimals / 9 digits
+            if let dot = amount.firstIndex(of: "."),
+               amount.distance(from: amount.index(after: dot), to: amount.endIndex) >= 2 { return }
+            guard amount.count < 9 else { return }
+            amount = (amount == "0") ? key : amount + key
+        }
+    }
+
     // MARK: - Pieces
 
-    private var amountField: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var amountCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
             Text(isSplitting ? "Total bill" : "Amount")
-                .font(.caption).foregroundStyle(.secondary)
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.inkSecondary)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text("₹")
-                    .font(.system(size: 30, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
-                TextField("0", text: $amount)
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(amount.isEmpty ? Color.inkSecondary : Color.ink)
+                Text(amount.isEmpty ? "0" : amount)
                     .font(.system(size: 40, weight: .bold, design: .rounded))
-                    .keyboardType(.decimalPad)
+                    .foregroundStyle(amount.isEmpty ? Color.inkSecondary.opacity(0.6) : Color.ink)
+                    .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
             }
-            .padding()
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.cardBG, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .animation(.snappy(duration: 0.15), value: amount)
     }
 
     private var pillGrid: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Category")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.inkSecondary)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10),
                                 GridItem(.flexible(), spacing: 10)],
                       spacing: 10) {
@@ -146,16 +170,18 @@ struct CaptureSheet: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: style.icon).font(.subheadline)
+                Image(systemName: style.icon)
+                    .font(.subheadline)
+                    .foregroundStyle(isOn ? Color.white : style.color)
                 Text(cat)
-                    .font(.subheadline.weight(.medium))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(isOn ? Color.white : Color.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(isOn ? style.color : style.color.opacity(0.15))
-            .foregroundStyle(isOn ? Color.white : style.color)
+            .background(isOn ? Color.accentColor : Color.cardBG)
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -164,13 +190,14 @@ struct CaptureSheet: View {
     private var customField: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Name this category")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.inkSecondary)
             TextField("e.g. Doctor, Gift…", text: $custom)
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
+                .foregroundStyle(Color.ink)
                 .padding()
-                .background(Color(.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(Color.cardBG, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
 
@@ -181,8 +208,12 @@ struct CaptureSheet: View {
                     Image(systemName: "person.2.fill")
                         .foregroundStyle(Color.accentColor)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Split with group").font(.subheadline.weight(.medium))
-                        Text("Counts only your share").font(.caption).foregroundStyle(.secondary)
+                        Text("Split with group")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.ink)
+                        Text("Counts only your share")
+                            .font(.caption)
+                            .foregroundStyle(Color.inkSecondary)
                     }
                 }
             }
@@ -201,33 +232,48 @@ struct CaptureSheet: View {
                             }
                         }
                     }
+                    .noScrollEdgeEffect()
                     Button { showContacts = true } label: {
                         Image(systemName: "pencil")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.inkSecondary)
                             .frame(width: 36, height: 36)
-                            .background(Color(.tertiarySystemGroupedBackground), in: Circle())
+                            .background(Color.toggleTrack, in: Circle())
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
+        .padding(16)
+        .background(Color.cardBG, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
-    private var saveButton: some View {
-        Button(action: save) {
-            Text(saving ? "Saving…" : (isEditing ? "Save changes" : "Save expense"))
-                .font(.headline)
-                .foregroundStyle(canSave ? Color.white : Color.secondary)
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(
-                    canSave ? Color.accentColor : Color(.systemGray3),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                )
+    private var ctaRow: some View {
+        HStack(spacing: 12) {
+            Button { dismiss() } label: {
+                Text("Cancel")
+                    .font(.headline)
+                    .foregroundStyle(Color.ink)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(Color.cardBG, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
+            Button(action: save) {
+                Text(saving ? "Saving…" : (isEditing ? "Save changes" : "Save expense"))
+                    .font(.headline)
+                    .foregroundStyle(canSave ? Color.white : Color.inkSecondary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(
+                        canSave ? Color.accentColor : Color.toggleTrack,
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(!canSave)
         }
-        .buttonStyle(.plain)
-        .disabled(!canSave)
     }
 
     private func save() {
@@ -246,6 +292,56 @@ struct CaptureSheet: View {
 
     private func trimmed(_ d: Double) -> String {
         d == d.rounded() ? String(Int(d)) : String(d)
+    }
+}
+
+// MARK: - Soft custom keypad
+
+private struct Keypad: View {
+    let onTap: (String) -> Void
+
+    private let rows: [[String]] = [
+        ["1", "2", "3"],
+        ["4", "5", "6"],
+        ["7", "8", "9"],
+        [".", "0", "⌫"]
+    ]
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ForEach(rows, id: \.self) { row in
+                HStack(spacing: 8) {
+                    ForEach(row, id: \.self) { key in
+                        keyButton(key)
+                    }
+                }
+            }
+        }
+    }
+
+    private func keyButton(_ key: String) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            onTap(key)
+        } label: {
+            Group {
+                if key == "⌫" {
+                    Image(systemName: "delete.left")
+                        .font(.system(size: 20, weight: .semibold))
+                } else {
+                    Text(key)
+                        .font(.system(size: 24, weight: .semibold, design: .rounded))
+                }
+            }
+            .foregroundStyle(Color.ink)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(
+                key == "⌫" ? Color.toggleTrack : Color.cardBG,
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
