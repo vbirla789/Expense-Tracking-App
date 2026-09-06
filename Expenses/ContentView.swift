@@ -365,15 +365,17 @@ struct CategoryFilterBar: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.caption2)
-                    .foregroundStyle(isOn ? Color.white : color)
+                    .foregroundStyle(color)
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(isOn ? Color.white : Color.ink)
+                    .foregroundStyle(Color.ink)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
-            .background(isOn ? Color.accentColor : Color.cardBG)
-            .clipShape(Capsule())
+            .background(Color.cardBG, in: Capsule())
+            // Selection = outline only (no fill), so the chip keeps its
+            // surface colour and the active one is still obvious.
+            .overlay(Capsule().strokeBorder(isOn ? Color.ink : .clear, lineWidth: 2))
         }
         .buttonStyle(.plain)
     }
