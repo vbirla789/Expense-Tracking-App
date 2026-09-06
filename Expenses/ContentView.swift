@@ -360,16 +360,17 @@ struct CategoryFilterBar: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.caption2)
-                    .foregroundStyle(color)
+                    .foregroundStyle(isOn ? Color.accentColor : color)
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.ink)
+                    .foregroundStyle(isOn ? Color.accentColor : Color.ink)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
-            // Selected = soft orange tint fill (no stroke); unselected stays a
+            // Selected = soft orange fill + orange stroke; unselected stays a
             // plain white chip.
-            .background(isOn ? Color.accentColor.opacity(0.14) : Color.cardBG, in: Capsule())
+            .background(isOn ? Color.accentColor.opacity(0.12) : Color.cardBG, in: Capsule())
+            .overlay(Capsule().strokeBorder(isOn ? Color.accentColor : .clear, lineWidth: 1.5))
         }
         .buttonStyle(.plain)
     }

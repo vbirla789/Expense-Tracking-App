@@ -272,32 +272,21 @@ struct CaptureSheet: View {
         .background(Color.cardBG, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
+    /// Save only — the sheet is dismissed by swiping down / tapping outside.
     private var ctaRow: some View {
-        HStack(spacing: 12) {
-            Button { dismiss() } label: {
-                Text("Cancel")
-                    .font(.headline)
-                    .foregroundStyle(Color.ink)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(Color.cardBG, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-            .buttonStyle(.plain)
-
-            Button(action: save) {
-                Text(saving ? "Saving…" : (isEditing ? "Save changes" : "Save expense"))
-                    .font(.headline)
-                    .foregroundStyle(canSave ? Color.white : Color.inkSecondary)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(
-                        canSave ? Color.accentColor : Color.toggleTrack,
-                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    )
-            }
-            .buttonStyle(.plain)
-            .disabled(!canSave)
+        Button(action: save) {
+            Text(saving ? "Saving…" : (isEditing ? "Save changes" : "Save expense"))
+                .font(.headline)
+                .foregroundStyle(canSave ? Color.white : Color.inkSecondary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(
+                    canSave ? Color.accentColor : Color.toggleTrack,
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
         }
+        .buttonStyle(.plain)
+        .disabled(!canSave)
     }
 
     private func save() {
