@@ -22,6 +22,12 @@ extension Color {
     /// Track behind the scope toggle.
     static let toggleTrack = dynamic(light: UIColor(red: 0.886, green: 0.890, blue: 0.922, alpha: 1),
                                      dark:  UIColor(red: 0.149, green: 0.165, blue: 0.200, alpha: 1))
+    /// Hero surface — a soft warm tint of the accent, not a saturated fill.
+    static let heroBG = dynamic(light: UIColor(red: 1.000, green: 0.945, blue: 0.918, alpha: 1),
+                                dark:  UIColor(red: 0.161, green: 0.114, blue: 0.090, alpha: 1))
+    /// Hairline separating cards from the page.
+    static let hairline = dynamic(light: UIColor(red: 0.894, green: 0.898, blue: 0.925, alpha: 1),
+                                  dark:  UIColor(red: 0.180, green: 0.196, blue: 0.235, alpha: 1))
 }
 
 struct ContentView: View {
@@ -83,24 +89,32 @@ struct CategoryStyle {
     let icon: String
     let color: Color
 
+    /// Muted, low-saturation hues — full-strength system colours read as a
+    /// rainbow next to the soft surfaces.
+    private static func hue(_ r: Double, _ g: Double, _ b: Double) -> Color {
+        Color(red: r / 255, green: g / 255, blue: b / 255)
+    }
+
     static func of(_ name: String) -> CategoryStyle {
         switch name {
-        case "Cab":                   return .init(icon: "car.fill", color: .blue)
-        case "Sutta", "Ciggs":        return .init(icon: "smoke.fill", color: .teal)
-        case "Groceries":             return .init(icon: "cart.fill", color: .green)
-        case "Outing":                return .init(icon: "party.popper.fill", color: .purple)
-        case "Rent":                  return .init(icon: "house.fill", color: .brown)
-        case "Others", "Other":       return .init(icon: "ellipsis.circle.fill", color: .gray)
-        case "Food", "Food & Dining": return .init(icon: "fork.knife", color: .orange)
-        case "Shopping":              return .init(icon: "bag.fill", color: .pink)
-        case "Income":                return .init(icon: "arrow.down.circle.fill", color: .green)
-        case "Uncategorized":         return .init(icon: "questionmark.circle.fill", color: .gray)
+        case "Cab":                   return .init(icon: "car.fill", color: hue(91, 124, 199))
+        case "Sutta", "Ciggs":        return .init(icon: "smoke.fill", color: hue(79, 163, 172))
+        case "Groceries":             return .init(icon: "cart.fill", color: hue(93, 162, 121))
+        case "Outing":                return .init(icon: "party.popper.fill", color: hue(140, 119, 196))
+        case "Rent":                  return .init(icon: "house.fill", color: hue(180, 138, 103))
+        case "Others", "Other":       return .init(icon: "ellipsis", color: hue(138, 143, 163))
+        case "Food", "Food & Dining": return .init(icon: "fork.knife", color: hue(212, 138, 76))
+        case "Shopping":              return .init(icon: "bag.fill", color: hue(198, 122, 152))
+        case "Income":                return .init(icon: "arrow.down.circle.fill", color: hue(93, 162, 121))
+        case "Uncategorized":         return .init(icon: "questionmark", color: hue(138, 143, 163))
         default:                      return .init(icon: "tag.fill", color: stableColor(name))
         }
     }
 
     private static func stableColor(_ s: String) -> Color {
-        let palette: [Color] = [.blue, .green, .orange, .pink, .purple, .red, .teal, .indigo, .mint, .cyan]
+        let palette: [Color] = [hue(91, 124, 199), hue(93, 162, 121), hue(212, 138, 76),
+                                hue(198, 122, 152), hue(140, 119, 196), hue(79, 163, 172),
+                                hue(180, 138, 103), hue(138, 143, 163)]
         let sum = s.unicodeScalars.reduce(0) { $0 + Int($1.value) }
         return palette[sum % palette.count]
     }
@@ -155,17 +169,19 @@ struct DashboardView: View {
         List {
             Section {
                 HStack {
-                    Text(selectedCategory ?? "All transactions")
-                        .font(.subheadline.weight(.semibold))
+                    Text((selectedCategory ?? "All transactions").uppercased())
+                        .font(.caption2.weight(.semibold))
+                        .kerning(0.8)
                         .foregroundStyle(Color.inkSecondary)
                     Spacer()
                     if selectedCategory != nil {
                         Text(inr(filteredTotal))
-                            .font(.subheadline.weight(.semibold))
+                            .font(.caption2.weight(.semibold))
+                            .monospacedDigit()
                             .foregroundStyle(Color.inkSecondary)
                     }
                 }
-                .listRowInsets(EdgeInsets(top: 14, leading: 16, bottom: 0, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 16, leading: 18, bottom: 2, trailing: 18))
                 .listRowBackground(Color.cardBG)
                 .listRowSeparator(.hidden)
 
@@ -241,11 +257,12 @@ struct HeroSummary: View {
     var onStep: (Int) -> Void = { _ in }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.85))
+                Text(title.uppercased())
+                    .font(.caption2.weight(.semibold))
+                    .kerning(0.8)
+                    .foregroundStyle(Color.inkSecondary)
                 Spacer()
                 // Always in the layout so the card height never changes;
                 // just faded out (and untappable) in all-time mode.
@@ -262,38 +279,35 @@ struct HeroSummary: View {
             // looks broken. A deliberate smaller-weight symbol reads cleanly.
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text("₹")
-                    .font(.system(size: 32, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.95))
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
                 Text(inrDigits(total))
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 44, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ink)
+                    .monospacedDigit()
                     .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
 
-            Label("\(count) transactions", systemImage: "list.bullet")
+            Text("\(count) transaction\(count == 1 ? "" : "s")")
                 .font(.caption.weight(.medium))
-                .foregroundStyle(.white.opacity(0.9))
-                .padding(.top, 6)
+                .foregroundStyle(Color.inkSecondary)
         }
-        .padding(22)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.65)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        // (no shadow: inside a List row it gets clipped to a rectangle and
-        // shows as a broken band around the card)
+        .background(Color.heroBG)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        // (no shadow: List clips it into a hard rectangular band)
     }
 
     private func navButton(_ icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.white)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(enabled ? Color.ink : Color.inkSecondary)
                 .frame(width: 28, height: 28)
-                .background(.white.opacity(enabled ? 0.22 : 0.10), in: Circle())
-                .opacity(enabled ? 1 : 0.45)
+                .background(Color.cardBG.opacity(enabled ? 1 : 0.5), in: Circle())
         }
         .buttonStyle(.borderless)   // isolate taps inside the List row
         .disabled(!enabled)
@@ -364,18 +378,18 @@ struct CategoryFilterBar: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.caption2)
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(color)
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(Color.ink)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 13)
             .padding(.vertical, 9)
             .background(Color.cardBG, in: Capsule())
             // Selection = outline only (no fill), so the chip keeps its
             // surface colour and the active one is still obvious.
-            .overlay(Capsule().strokeBorder(isOn ? Color.ink : .clear, lineWidth: 2))
+            .overlay(Capsule().strokeBorder(isOn ? Color.ink : .clear, lineWidth: 1.5))
         }
         .buttonStyle(.plain)
     }
@@ -412,10 +426,11 @@ struct TransactionRow: View {
             Spacer()
 
             Text((tx.category == "Income" ? "+" : "") + inr(tx.effectiveAmount))
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(tx.category == "Income" ? Color.green : Color.ink)
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(tx.category == "Income" ? CategoryStyle.of("Income").color : Color.ink)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 7)
         .contentShape(Rectangle())
     }
 }
@@ -441,10 +456,13 @@ struct EmptyTransactions: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 34))
+                .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(Color.inkSecondary)
+                .frame(width: 52, height: 52)
+                .background(Color.toggleTrack.opacity(0.55), in: Circle())
+                .padding(.bottom, 2)
             Text(title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Color.ink)
@@ -454,7 +472,7 @@ struct EmptyTransactions: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
+        .padding(.vertical, 26)
     }
 }
 
@@ -535,9 +553,9 @@ func relativeDay(_ date: Date) -> String {
 @ViewBuilder
 func iconBubble(_ style: CategoryStyle) -> some View {
     ZStack {
-        Circle().fill(style.color.opacity(0.18)).frame(width: 40, height: 40)
+        Circle().fill(style.color.opacity(0.13)).frame(width: 38, height: 38)
         Image(systemName: style.icon)
-            .font(.system(size: 16))
+            .font(.system(size: 15, weight: .medium))
             .foregroundStyle(style.color)
     }
 }
